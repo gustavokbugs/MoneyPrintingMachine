@@ -16,7 +16,9 @@ Every AI feature runs on a local model through [Ollama](https://github.com/ollam
 | Trend data: YouTube Data API (demand, competition, momentum snapshots) | Implemented (needs `YOUTUBE_API_KEY`) |
 | Name handle checks against YouTube | Implemented (needs `YOUTUBE_API_KEY`) |
 | YouTube account connection (OAuth 2.0 + PKCE, encrypted tokens, verification) | Implemented (needs a Google OAuth client) |
-| Trend data: RSS, Reddit | Not yet |
+| Scheduled trend refresh (watchlist re-measured daily) | Implemented |
+| News mentions from RSS feeds | Implemented (add feeds on the Trends page) |
+| Trend data: Reddit | Not yet |
 | TikTok and Instagram connections | Not yet; guided manual setup only |
 | Script, narration, visuals, rendering, publishing, analytics | Not yet |
 
