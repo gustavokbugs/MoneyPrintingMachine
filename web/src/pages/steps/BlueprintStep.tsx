@@ -1,4 +1,6 @@
-import { Empty, ErrorState, JobProgress, ProvenanceNote, Section, TagList } from "../../components/ui";
+import { ArrowRight, CalendarDays, LayoutList } from "lucide-react";
+import { GenerationPanel } from "../../components/GenerationPanel";
+import { Button, Section, TagList } from "../../components/ui";
 import { useGeneration } from "../../hooks/useGeneration";
 import { formatCalendarDate, formatDuration, t } from "../../i18n";
 import type { StepProps } from "../ChannelWizard";
@@ -10,26 +12,22 @@ export function BlueprintStep({ channel, goTo }: StepProps) {
 
   return (
     <div className="stack">
-      <Section
+      <GenerationPanel
         title={t("blueprint.title")}
-        actions={
-          <button type="button" className="btn btn-secondary" disabled={gen.running || locked || !channel.strategy} onClick={gen.start}>
-            {bp ? t("common.regenerate") : t("common.generate")}
-          </button>
-        }
-      >
-        <p className="small muted">{t("blueprint.slow")}</p>
-        {gen.startError && <ErrorState error={gen.startError} />}
-        {gen.jobId && <JobProgress job={gen.job.data} error={gen.job.error} />}
-        {!bp && !gen.jobId && <Empty>{t("blueprint.empty")}</Empty>}
-        {bp && <ProvenanceNote p={bp.provenance} />}
-      </Section>
+        description={t("blueprint.description")}
+        gen={gen}
+        provenance={bp?.provenance}
+        disabled={gen.running || locked || !channel.strategy}
+        emptyIcon={LayoutList}
+        emptyText={t("blueprint.empty")}
+        hint={t("blueprint.slow")}
+      />
 
       {bp && (
         <>
-          <div className="grid-2">
+          <div className="grid-halves">
             <Section title={t("blueprint.priority")}>
-              <ol>
+              <ol className="small">
                 {bp.priorityTopics.map((p) => (
                   <li key={p}>{p}</li>
                 ))}
@@ -49,7 +47,10 @@ export function BlueprintStep({ channel, goTo }: StepProps) {
               <ul className="plain-list">
                 {bp.formats.map((f) => (
                   <li key={f.name}>
-                    <strong>{f.name}</strong> · {f.aspectRatio} · {formatDuration(f.durationSeconds)}
+                    <strong>{f.name}</strong>{" "}
+                    <span className="small muted tabular">
+                      · {f.aspectRatio} · {formatDuration(f.durationSeconds)}
+                    </span>
                     <p className="small muted">{f.description}</p>
                   </li>
                 ))}
@@ -60,15 +61,16 @@ export function BlueprintStep({ channel, goTo }: StepProps) {
             </Section>
           </div>
 
-          <Section title={t("blueprint.ideas", { count: bp.ideas.length })}>
+          <Section title={t("blueprint.ideas", { count: bp.ideas.length })} description={t("blueprint.ideasHelp")}>
             <ol className="ideas">
               {bp.ideas.map((idea, i) => (
                 <li key={`${i}-${idea.workingTitle}`}>
                   <details>
                     <summary>
-                      <strong>{idea.workingTitle}</strong>{" "}
-                      <span className="small muted">
-                        · {idea.format} · {formatDuration(idea.suggestedDurationSeconds)}
+                      <span className="muted tabular">{i + 1}.</span>
+                      <strong>{idea.workingTitle}</strong>
+                      <span className="small muted tabular">
+                        {idea.format} · {formatDuration(idea.suggestedDurationSeconds)}
                       </span>
                     </summary>
                     <dl className="fields">
@@ -97,28 +99,39 @@ export function BlueprintStep({ channel, goTo }: StepProps) {
             </ol>
           </Section>
 
-          <Section title={t("blueprint.calendar")}>
+          <Section title={t("blueprint.calendar")} description={bp.calendar[0] ? t("blueprint.calendarTz", { tz: bp.calendar[0].timeZone }) : undefined}>
             <div className="table-wrap">
               <table>
+                <caption className="sr-only">{t("blueprint.calendar")}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">
+                      <span className="row">
+                        <CalendarDays size={14} aria-hidden="true" />
+                        {t("blueprint.date")}
+                      </span>
+                    </th>
+                    <th scope="col">{t("blueprint.video")}</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {bp.calendar.map((e) => (
                     <tr key={`${e.date}-${e.ideaIndex}`}>
-                      <th scope="row">
+                      <td className="tabular">
                         {formatCalendarDate(e.date)} {e.localTime}
-                      </th>
+                      </td>
                       <td>{bp.ideas[e.ideaIndex]?.workingTitle ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="small muted">{bp.calendar[0]?.timeZone}</p>
           </Section>
 
           <div className="row">
-            <button type="button" className="btn btn-primary" onClick={() => goTo("review")}>
+            <Button variant="primary" icon={ArrowRight} onClick={() => goTo("review")}>
               {t("common.continue")}
-            </button>
+            </Button>
           </div>
         </>
       )}

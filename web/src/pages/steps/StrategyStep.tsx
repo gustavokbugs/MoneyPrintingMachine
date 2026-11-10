@@ -1,7 +1,9 @@
+import { ArrowRight, Target } from "lucide-react";
 import { api } from "../../api/client";
 import type { Strategy } from "../../api/types";
 import { EditableText } from "../../components/EditableText";
-import { Empty, ErrorState, Field, JobProgress, ProvenanceNote, Section, TagList } from "../../components/ui";
+import { GenerationPanel } from "../../components/GenerationPanel";
+import { Button, ErrorState, Field, TagList } from "../../components/ui";
 import { useGeneration } from "../../hooks/useGeneration";
 import { formatDuration, t } from "../../i18n";
 import type { StepProps } from "../ChannelWizard";
@@ -17,28 +19,22 @@ export function StrategyStep({ channel, goTo }: StepProps) {
   const edit = (patch: Partial<Strategy>) => (s ? save.mutateAsync({ ...s, ...patch }) : Promise.resolve());
 
   const next = () => {
-    if (channel.status === "draft") {
-      advance.mutate(undefined, { onSuccess: () => goTo("branding") });
-    } else {
-      goTo("branding");
-    }
+    if (channel.status === "draft") advance.mutate(undefined, { onSuccess: () => goTo("branding") });
+    else goTo("branding");
   };
 
   return (
-    <Section
+    <GenerationPanel
       title={t("strategy.title")}
-      actions={
-        <button type="button" className="btn btn-secondary" disabled={gen.running || locked} onClick={gen.start}>
-          {s ? t("common.regenerate") : t("common.generate")}
-        </button>
-      }
+      description={t("strategy.description")}
+      gen={gen}
+      provenance={s?.provenance}
+      disabled={gen.running || locked}
+      emptyIcon={Target}
+      emptyText={t("strategy.empty")}
     >
-      {gen.startError && <ErrorState error={gen.startError} />}
-      {gen.jobId && <JobProgress job={gen.job.data} error={gen.job.error} />}
-      {!s && !gen.jobId && <Empty>{t("strategy.empty")}</Empty>}
       {s && (
         <>
-          <ProvenanceNote p={s.provenance} />
           <dl className="fields">
             <EditableText label={t("strategy.audience")} value={s.targetAudience} multiline onSave={(v) => edit({ targetAudience: v })} />
             <EditableText label={t("strategy.geography")} value={s.audienceGeography} onSave={(v) => edit({ audienceGeography: v })} />
@@ -51,19 +47,24 @@ export function StrategyStep({ channel, goTo }: StepProps) {
               <ul className="plain-list">
                 {s.videoFormats.map((f) => (
                   <li key={f.name}>
-                    <strong>{f.name}</strong> · {f.aspectRatio} · {formatDuration(f.durationSeconds)}
+                    <strong>{f.name}</strong>{" "}
+                    <span className="small muted tabular">
+                      · {f.aspectRatio} · {formatDuration(f.durationSeconds)}
+                    </span>
                     <p className="small muted">{f.description}</p>
                   </li>
                 ))}
               </ul>
             </Field>
             <Field label={t("strategy.schedule")}>
-              {t("strategy.scheduleValue", {
-                count: s.publishingFrequency.videosPerWeek,
-                days: s.publishingFrequency.days.join(", "),
-                time: s.publishingFrequency.localTime,
-                tz: s.publishingFrequency.timeZone,
-              })}
+              <span className="tabular">
+                {t("strategy.scheduleValue", {
+                  count: s.publishingFrequency.videosPerWeek,
+                  days: s.publishingFrequency.days.join(", "),
+                  time: s.publishingFrequency.localTime,
+                  tz: s.publishingFrequency.timeZone,
+                })}
+              </span>
             </Field>
             <Field label={t("strategy.competitors")}>
               <TagList items={s.competitorReferences} />
@@ -75,12 +76,12 @@ export function StrategyStep({ channel, goTo }: StepProps) {
           </dl>
           {advance.isError && <ErrorState error={advance.error} />}
           <div className="row">
-            <button type="button" className="btn btn-primary" disabled={advance.isPending || locked} onClick={next}>
+            <Button variant="primary" icon={ArrowRight} loading={advance.isPending} disabled={locked} onClick={next}>
               {t("strategy.toBranding")}
-            </button>
+            </Button>
           </div>
         </>
       )}
-    </Section>
+    </GenerationPanel>
   );
 }

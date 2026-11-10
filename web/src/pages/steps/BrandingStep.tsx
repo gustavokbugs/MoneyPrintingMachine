@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, AtSign, Check, Download, Paintbrush, Shuffle } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../api/client";
 import type { Identity, NameAvailability, Palette } from "../../api/types";
 import { downloadSvgAsPng, downloadUrl, slug } from "../../components/download";
 import { EditableText } from "../../components/EditableText";
-import { Empty, ErrorState, Field, JobProgress, ProvenanceNote, Section, TagList, errorMessage } from "../../components/ui";
+import { useToast } from "../../components/feedback";
+import { GenerationPanel } from "../../components/GenerationPanel";
+import { Badge, Button, ErrorState, Field, Notice, Section, TagList, errorMessage, type Tone } from "../../components/ui";
 import { useGeneration } from "../../hooks/useGeneration";
 import { t, type MessageKey } from "../../i18n";
 import type { StepProps } from "../ChannelWizard";
@@ -13,21 +16,39 @@ import { useChannelUpdate } from "./shared";
 const VARIANTS = 4;
 const paletteKeys: (keyof Palette)[] = ["primary", "secondary", "accent", "background", "text"];
 
-const availabilityClass: Record<NameAvailability, string> = {
-  not_checked: "chip",
-  handle_taken: "chip chip-low",
-  no_channel_with_handle: "chip chip-high",
-  invalid_handle: "chip chip-medium",
+const availabilityTone: Record<NameAvailability, Tone> = {
+  not_checked: "neutral",
+  handle_taken: "danger",
+  no_channel_with_handle: "success",
+  invalid_handle: "warning",
 };
 
-function AvailabilityChip({ availability, handle }: { availability: NameAvailability | ""; handle?: string }) {
+function AvailabilityBadge({ availability, handle }: { availability: NameAvailability | ""; handle?: string }) {
   const a: NameAvailability = availability === "" ? "not_checked" : availability;
   return (
-    <span className={availabilityClass[a]}>{t(`branding.availability.${a}` as MessageKey, { handle: handle ?? "" })}</span>
+    <Badge tone={availabilityTone[a]} icon={a === "not_checked" ? undefined : AtSign}>
+      {t(`branding.availability.${a}` as MessageKey, { handle: handle ?? "" })}
+    </Badge>
+  );
+}
+
+function AssetActions({ url, width, height, stem, onError }: { url: string; width: number; height: number; stem: string; onError: (msg: string) => void }) {
+  const run = (fn: () => Promise<void>) => fn().catch((err: unknown) => onError(errorMessage(err)));
+  return (
+    <div className="row wrap">
+      <Button size="sm" variant="ghost" icon={Download} onClick={() => run(() => downloadSvgAsPng(url, width, height, `${stem}.png`))}>
+        {t("branding.downloadPng")}
+      </Button>
+      <Button size="sm" variant="ghost" icon={Download} onClick={() => run(() => downloadUrl(url, `${stem}.svg`))}>
+        {t("branding.downloadSvg")}
+      </Button>
+    </div>
   );
 }
 
 export function BrandingStep({ channel, goTo }: StepProps) {
+  const qc = useQueryClient();
+  const toast = useToast();
   const gen = useGeneration(channel.id, "identity");
   const saveIdentity = useChannelUpdate(channel.id, (i: Identity) => api.putIdentity(channel.id, i));
   const setName = useChannelUpdate(channel.id, (name: string) => api.updateChannel(channel.id, { name }));
@@ -36,77 +57,69 @@ export function BrandingStep({ channel, goTo }: StepProps) {
   const [customName, setCustomName] = useState("");
   const [paletteDraft, setPaletteDraft] = useState<Palette | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [checkWarning, setCheckWarning] = useState<string | null>(null);
   const idn = channel.identity;
   const locked = channel.status === "archived";
 
-  const qc = useQueryClient();
   const integrations = useQuery({ queryKey: ["integrations"], queryFn: api.integrations });
   const handleChecks = integrations.data?.youtubeDataApi.configured === true;
-  const [checkWarning, setCheckWarning] = useState<string | null>(null);
   const checkNames = useMutation({
     mutationFn: () => api.checkNames(channel.id),
     onSuccess: (res) => {
       qc.setQueryData(["channel", channel.id], res.channel);
       void qc.invalidateQueries({ queryKey: ["integrations"] });
       setCheckWarning(res.complete ? null : res.warning);
+      if (res.complete) toast.success(t("branding.checkDone"));
     },
   });
 
   const edit = (patch: Partial<Identity>) => (idn ? saveIdentity.mutateAsync({ ...idn, ...patch }) : Promise.resolve());
-  const fileStem = slug(channel.name || channel.niche);
+  const stem = slug(channel.name || channel.niche);
+  const avatarUrl = api.assetUrl(channel.id, "avatar", variant, channel.version);
+  const bannerUrl = api.assetUrl(channel.id, "banner", variant, channel.version);
 
-  const download = (fn: () => Promise<void>) => {
-    setDownloadError(null);
-    fn().catch((err: unknown) => setDownloadError(errorMessage(err)));
-  };
+  const chooseName = (name: string, after?: () => void) =>
+    setName.mutate(name, {
+      onSuccess: () => {
+        toast.success(t("branding.nameSelected", { name }));
+        after?.();
+      },
+    });
 
   const next = () => {
-    if (channel.status === "branding") {
-      advance.mutate(undefined, { onSuccess: () => goTo("platforms") });
-    } else {
-      goTo("platforms");
-    }
+    if (channel.status === "branding") advance.mutate(undefined, { onSuccess: () => goTo("platforms") });
+    else goTo("platforms");
   };
 
   return (
     <div className="stack">
-      <Section
+      <GenerationPanel
         title={t("branding.title")}
-        actions={
-          <button type="button" className="btn btn-secondary" disabled={gen.running || locked || !channel.strategy} onClick={gen.start}>
-            {idn ? t("common.regenerate") : t("common.generate")}
-          </button>
-        }
-      >
-        {gen.startError && <ErrorState error={gen.startError} />}
-        {gen.jobId && <JobProgress job={gen.job.data} error={gen.job.error} />}
-        {!idn && !gen.jobId && <Empty>{t("branding.empty")}</Empty>}
-        {idn && <ProvenanceNote p={idn.provenance} />}
-      </Section>
+        description={t("branding.description.help")}
+        gen={gen}
+        provenance={idn?.provenance}
+        disabled={gen.running || locked || !channel.strategy}
+        emptyIcon={Paintbrush}
+        emptyText={channel.strategy ? t("branding.empty") : t("branding.needsStrategy")}
+      />
 
       {idn && (
         <>
           <Section
             title={t("branding.names")}
+            description={t("branding.namesHint")}
             actions={
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={!handleChecks || checkNames.isPending || locked}
-                title={handleChecks ? undefined : t("branding.checkUnavailable")}
-                onClick={() => checkNames.mutate()}
-              >
-                {checkNames.isPending ? t("branding.checking") : t("branding.checkNames")}
-              </button>
+              <Button icon={AtSign} loading={checkNames.isPending} disabled={!handleChecks || locked} onClick={() => checkNames.mutate()}>
+                {t("branding.checkNames")}
+              </Button>
             }
           >
-            <p className="small muted">{t("branding.namesHint")}</p>
             {!handleChecks && integrations.isSuccess && <p className="small muted">{t("branding.checkUnavailable")}</p>}
             {checkNames.isError && <ErrorState error={checkNames.error} />}
             {checkWarning && (
-              <div className="alert alert-warning" role="status">
+              <Notice tone="warning" live>
                 {t("branding.checkPartial", { reason: checkWarning })}
-              </div>
+              </Notice>
             )}
             <ul className="name-grid">
               {idn.nameSuggestions.map((n) => {
@@ -114,40 +127,43 @@ export function BrandingStep({ channel, goTo }: StepProps) {
                 return (
                   <li key={n.name} className={selected ? "name selected" : "name"}>
                     <strong>{n.name}</strong>
-                    <AvailabilityChip availability={n.availability} handle={n.handle} />
+                    <AvailabilityBadge availability={n.availability} handle={n.handle} />
                     <p className="small muted">{n.rationale}</p>
-                    <button
-                      type="button"
-                      className={selected ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
-                      disabled={selected || setName.isPending || locked}
+                    <Button
+                      size="sm"
+                      variant={selected ? "primary" : "secondary"}
+                      icon={selected ? Check : undefined}
+                      loading={setName.isPending && setName.variables === n.name}
+                      disabled={selected || locked}
                       aria-pressed={selected}
-                      onClick={() => setName.mutate(n.name)}
+                      onClick={() => chooseName(n.name)}
                     >
                       {selected ? t("branding.selected") : t("branding.selectName")}
-                    </button>
+                    </Button>
                   </li>
                 );
               })}
             </ul>
             <form
-              className="inline-form"
+              className="field-group"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (customName.trim()) setName.mutate(customName.trim(), { onSuccess: () => setCustomName("") });
+                const name = customName.trim();
+                if (name) chooseName(name, () => setCustomName(""));
               }}
             >
               <label htmlFor="custom-name">{t("branding.customName")}</label>
-              <div className="row">
+              <div className="input-row">
                 <input id="custom-name" maxLength={100} value={customName} onChange={(e) => setCustomName(e.target.value)} />
-                <button type="submit" className="btn btn-secondary" disabled={!customName.trim() || setName.isPending || locked}>
+                <Button type="submit" disabled={!customName.trim() || locked} loading={setName.isPending && setName.variables === customName.trim()}>
                   {t("branding.selectName")}
-                </button>
+                </Button>
               </div>
             </form>
             {setName.isError && <ErrorState error={setName.error} />}
           </Section>
 
-          <Section title={t("branding.description")}>
+          <Section title={t("branding.copyTitle")}>
             <dl className="fields">
               <EditableText label={t("branding.bio")} value={idn.shortBio} maxLength={300} onSave={(v) => edit({ shortBio: v })} />
               <EditableText label={t("branding.description")} value={idn.fullDescription} multiline onSave={(v) => edit({ fullDescription: v })} />
@@ -159,110 +175,85 @@ export function BrandingStep({ channel, goTo }: StepProps) {
             </dl>
           </Section>
 
-          <Section title={t("branding.palette")}>
-            <div className="palette">
-              {paletteKeys.map((k) => {
-                const value = paletteDraft?.[k] ?? idn.palette[k];
-                return (
-                  <label key={k} className="swatch">
-                    <input
-                      type="color"
-                      value={value}
-                      disabled={locked}
-                      onChange={(e) => setPaletteDraft({ ...(paletteDraft ?? idn.palette), [k]: e.target.value.toUpperCase() })}
-                    />
-                    <span className="small">{k}</span>
-                    <code className="small">{value}</code>
-                  </label>
-                );
-              })}
-            </div>
-            {paletteDraft && (
-              <div className="row">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  disabled={saveIdentity.isPending}
-                  onClick={() =>
-                    edit({ palette: paletteDraft })
-                      .then(() => setPaletteDraft(null))
-                      // The error is shown through saveIdentity.isError below.
-                      .catch(() => undefined)
-                  }
-                >
-                  {saveIdentity.isPending ? t("common.saving") : t("common.save")}
-                </button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaletteDraft(null)}>
-                  {t("common.cancel")}
-                </button>
+          <div className="grid-halves">
+            <Section title={t("branding.palette")} description={t("branding.paletteHelp")}>
+              <div className="palette">
+                {paletteKeys.map((k) => {
+                  const value = paletteDraft?.[k] ?? idn.palette[k];
+                  const id = `swatch-${k}`;
+                  return (
+                    <div key={k} className="swatch">
+                      <input
+                        id={id}
+                        type="color"
+                        value={value}
+                        disabled={locked}
+                        onChange={(e) => setPaletteDraft({ ...(paletteDraft ?? idn.palette), [k]: e.target.value.toUpperCase() })}
+                      />
+                      <label htmlFor={id} className="xs">
+                        {t(`branding.paletteKey.${k}` as MessageKey)}
+                      </label>
+                      <code className="xs">{value}</code>
+                    </div>
+                  );
+                })}
               </div>
-            )}
-            {saveIdentity.isError && <ErrorState error={saveIdentity.error} />}
-            <h3>{t("branding.typography")}</h3>
-            <p>
-              {idn.typography.headingFont} / {idn.typography.bodyFont}
-            </p>
-            <p className="small muted">{idn.typography.notes}</p>
-          </Section>
+              {paletteDraft && (
+                <div className="row">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    loading={saveIdentity.isPending}
+                    onClick={() =>
+                      edit({ palette: paletteDraft })
+                        .then(() => {
+                          setPaletteDraft(null);
+                          toast.success(t("branding.paletteSaved"));
+                        })
+                        // The error is shown through saveIdentity.isError below.
+                        .catch(() => undefined)
+                    }
+                  >
+                    {t("common.save")}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setPaletteDraft(null)}>
+                    {t("common.cancel")}
+                  </Button>
+                </div>
+              )}
+              {saveIdentity.isError && <ErrorState error={saveIdentity.error} />}
+            </Section>
+
+            <Section title={t("branding.typography")}>
+              <p>
+                <strong>{idn.typography.headingFont}</strong> <span className="muted">/</span> {idn.typography.bodyFont}
+              </p>
+              <p className="small muted">{idn.typography.notes}</p>
+            </Section>
+          </div>
 
           <Section
-            title={`${t("branding.avatar")} · ${t("branding.banner")}`}
+            title={t("branding.assetsTitle")}
+            description={t("branding.assetsHelp")}
             actions={
-              <button type="button" className="btn btn-secondary" onClick={() => setVariant((v) => (v + 1) % VARIANTS)}>
+              <Button icon={Shuffle} onClick={() => setVariant((v) => (v + 1) % VARIANTS)}>
                 {t("branding.variant")}
-              </button>
+              </Button>
             }
           >
+            <p className="xs muted" aria-live="polite">
+              {t("branding.variantOf", { n: variant + 1, total: VARIANTS })}
+            </p>
             <div className="assets">
               <figure>
-                <img
-                  className="avatar-lg"
-                  src={api.assetUrl(channel.id, "avatar", variant, channel.version)}
-                  alt={t("branding.avatar")}
-                  width={160}
-                  height={160}
-                />
+                <img className="avatar-lg" src={avatarUrl} alt={t("branding.avatarAlt", { name: channel.name || channel.niche })} width={160} height={160} />
                 <figcaption className="small muted">{idn.avatarConcept}</figcaption>
-                <div className="row">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() =>
-                      download(() => downloadSvgAsPng(api.assetUrl(channel.id, "avatar", variant, channel.version), 800, 800, `${fileStem}-avatar.png`))
-                    }
-                  >
-                    {t("branding.downloadPng")}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => download(() => downloadUrl(api.assetUrl(channel.id, "avatar", variant, channel.version), `${fileStem}-avatar.svg`))}
-                  >
-                    {t("branding.downloadSvg")}
-                  </button>
-                </div>
+                <AssetActions url={avatarUrl} width={800} height={800} stem={`${stem}-avatar`} onError={setDownloadError} />
               </figure>
-              <figure className="banner-fig">
-                <img className="banner" src={api.assetUrl(channel.id, "banner", variant, channel.version)} alt={t("branding.banner")} />
+              <figure>
+                <img className="banner" src={bannerUrl} alt={t("branding.bannerAlt", { name: channel.name || channel.niche })} width={2560} height={1440} />
                 <figcaption className="small muted">{t("branding.bannerHint")}</figcaption>
-                <div className="row">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() =>
-                      download(() => downloadSvgAsPng(api.assetUrl(channel.id, "banner", variant, channel.version), 2560, 1440, `${fileStem}-banner.png`))
-                    }
-                  >
-                    {t("branding.downloadPng")}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => download(() => downloadUrl(api.assetUrl(channel.id, "banner", variant, channel.version), `${fileStem}-banner.svg`))}
-                  >
-                    {t("branding.downloadSvg")}
-                  </button>
-                </div>
+                <AssetActions url={bannerUrl} width={2560} height={1440} stem={`${stem}-banner`} onError={setDownloadError} />
               </figure>
             </div>
             {downloadError && (
@@ -280,10 +271,11 @@ export function BrandingStep({ channel, goTo }: StepProps) {
               <EditableText label={t("branding.introOutro")} value={idn.introOutroGuidelines} multiline onSave={(v) => edit({ introOutroGuidelines: v })} />
             </dl>
             {advance.isError && <ErrorState error={advance.error} />}
-            <div className="row">
-              <button type="button" className="btn btn-primary" disabled={!channel.name || advance.isPending || locked} onClick={next}>
+            <div className="row wrap">
+              <Button variant="primary" icon={ArrowRight} loading={advance.isPending} disabled={!channel.name || locked} onClick={next}>
                 {t("branding.toPlatforms")}
-              </button>
+              </Button>
+              {!channel.name && <span className="small muted">{t("branding.chooseNameFirst")}</span>}
             </div>
           </Section>
         </>
