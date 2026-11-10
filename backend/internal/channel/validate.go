@@ -141,6 +141,11 @@ func (i Identity) Validate() error {
 		if err := checkText(fmt.Sprintf("nameSuggestions[%d].name", idx), n.Name, MaxNameLength, true); err != nil {
 			return err
 		}
+		switch n.Availability {
+		case "", AvailabilityNotChecked, AvailabilityHandleTaken, AvailabilityNoChannel, AvailabilityInvalidHandle:
+		default:
+			return &ValidationError{Field: fmt.Sprintf("nameSuggestions[%d].availability", idx), Message: "is not a known value"}
+		}
 	}
 	if err := checkText("shortBio", i.ShortBio, maxShortText, true); err != nil {
 		return err

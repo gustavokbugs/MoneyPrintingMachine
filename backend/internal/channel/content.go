@@ -60,12 +60,24 @@ type Identity struct {
 	Provenance           Provenance       `json:"provenance"`
 }
 
+// Name availability values. "no_channel_with_handle" means no YouTube
+// channel uses the derived handle; it does not guarantee the handle can be
+// claimed, and trademarks are never checked.
+const (
+	AvailabilityNotChecked    = "not_checked"
+	AvailabilityHandleTaken   = "handle_taken"
+	AvailabilityNoChannel     = "no_channel_with_handle"
+	AvailabilityInvalidHandle = "invalid_handle"
+)
+
 // NameSuggestion is one candidate channel name. Availability is never
 // claimed unless it was checked against a real data source.
 type NameSuggestion struct {
-	Name         string `json:"name"`
-	Rationale    string `json:"rationale"`
-	Availability string `json:"availability"` // "not_checked" until a checker is connected.
+	Name         string     `json:"name"`
+	Rationale    string     `json:"rationale"`
+	Availability string     `json:"availability"`
+	Handle       string     `json:"handle,omitempty"`
+	CheckedAt    *time.Time `json:"checkedAt,omitempty"`
 }
 
 // Palette holds brand colors as #RRGGBB hex strings.
