@@ -25,8 +25,10 @@ type Generator interface {
 
 // Engine runs Launchpad generation steps.
 type Engine struct {
-	gen Generator
-	now func() time.Time
+	gen      Generator
+	now      func() time.Time
+	measurer Measurer
+	handles  HandleLookup
 }
 
 // NewEngine builds an Engine.

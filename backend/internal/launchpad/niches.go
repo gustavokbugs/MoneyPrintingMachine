@@ -2,12 +2,15 @@ package launchpad
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
 	"contentfactory/internal/llm"
+	"contentfactory/internal/trends"
+	"contentfactory/internal/youtube"
 )
 
 // Rating is a qualitative heuristic estimate.
@@ -45,10 +48,16 @@ type Heuristics struct {
 // Measured holds values computed from real data sources. A nil value means
 // no measurement is available; it is never filled with a guess.
 type Measured struct {
+	// TrendScore and MomentumPercent need two snapshots at least 12 hours apart.
 	TrendScore       *float64 `json:"trendScore"`
+	MomentumPercent  *float64 `json:"momentumPercent"`
+	DemandScore      *float64 `json:"demandScore"`
 	CompetitionScore *float64 `json:"competitionScore"`
-	SearchInterest   *float64 `json:"searchInterest"`
-	Sources          []string `json:"sources"`
+	// SearchInterest stays nil: no official search-interest source exists.
+	SearchInterest *float64        `json:"searchInterest"`
+	Metrics        *trends.Metrics `json:"metrics"`
+	CollectedAt    *time.Time      `json:"collectedAt"`
+	Sources        []string        `json:"sources"`
 }
 
 // Niche is one recommended niche.
@@ -90,6 +99,8 @@ type DiscoverInput struct {
 	Query     string `json:"query"`
 	Language  string `json:"language"`
 	GeoTarget string `json:"geoTarget"`
+	// OwnerID scopes stored trend snapshots; set from the job, not input.
+	OwnerID string `json:"-"`
 }
 
 // MaxQueryLength bounds the custom niche query.
@@ -103,13 +114,11 @@ func (in DiscoverInput) Validate() error {
 	return nil
 }
 
-// trendSources lists the trend sources the engine knows about and their
-// current status. None are connected in this version, so every score in
-// Measured stays empty.
-func trendSources() []DataSourceStatus {
+// trendSources lists the trend sources and their status for one report.
+func trendSources(youtubeStatus DataSourceStatus) []DataSourceStatus {
 	return []DataSourceStatus{
-		{Name: "YouTube Data API", Status: "not_configured", Note: "Requires a free API key; adds competition and engagement data."},
-		{Name: "Google Trends", Status: "unavailable", Note: "No generally available official public API; access is limited."},
+		youtubeStatus,
+		{Name: "Google Trends", Status: "unavailable", Note: "No generally available official public API; search interest is not measured."},
 		{Name: "Reddit", Status: "not_configured", Note: "Requires an approved Reddit API application."},
 		{Name: "RSS / public news feeds", Status: "not_configured", Note: "Feed collection is not set up yet."},
 	}
@@ -229,8 +238,7 @@ Production uses narration, stock-free generated visuals, and motion graphics, wi
 		GeneratedAt: e.now().UTC(),
 		Model:       e.gen.Model(),
 		Basis: "Ratings are qualitative estimates from a local language model, not measurements. " +
-			"Measured trend and competition scores appear only when a trend data source is connected.",
-		DataSources: trendSources(),
+			"Measured demand, competition, and trend scores come only from connected data sources.",
 	}
 	seen := map[string]bool{}
 	for _, n := range out.Niches {
@@ -263,5 +271,69 @@ Production uses narration, stock-free generated visuals, and motion graphics, wi
 	}
 	rest := report.Niches[start:]
 	slices.SortStableFunc(rest, func(a, b Niche) int { return b.HeuristicScore - a.HeuristicScore })
+	report.DataSources = trendSources(e.measureNiches(ctx, in, report.Niches))
 	return report, nil
+}
+
+// Measurer takes trend measurements for a query.
+type Measurer interface {
+	Available() bool
+	Measure(ctx context.Context, r trends.Request) (trends.Result, error)
+}
+
+// WithMeasurer enables measured trend data in niche discovery.
+func (e *Engine) WithMeasurer(m Measurer) *Engine {
+	e.measurer = m
+	return e
+}
+
+const youtubeSourceName = "YouTube Data API"
+
+// measureNiches fills Measured for each niche and reports the YouTube
+// source status. Failures never fail discovery; they are reported instead.
+func (e *Engine) measureNiches(ctx context.Context, in DiscoverInput, niches []Niche) DataSourceStatus {
+	if e.measurer == nil || !e.measurer.Available() {
+		return DataSourceStatus{Name: youtubeSourceName, Status: "not_configured",
+			Note: "Set YOUTUBE_API_KEY to measure demand and competition from recent YouTube videos."}
+	}
+	measured, failed := 0, 0
+	var stopReason string
+	for i := range niches {
+		res, err := e.measurer.Measure(ctx, trends.Request{
+			OwnerID: in.OwnerID, Query: niches[i].Name, Region: in.GeoTarget, Language: in.Language,
+		})
+		if errors.Is(err, youtube.ErrQuotaBudget) || errors.Is(err, youtube.ErrQuotaExceeded) {
+			stopReason = "The daily YouTube quota budget was reached; remaining niches were not measured."
+			break
+		}
+		if errors.Is(err, youtube.ErrUnauthorized) {
+			stopReason = "YouTube rejected the API key."
+			break
+		}
+		if err != nil {
+			failed++
+			continue
+		}
+		collected := res.Snapshot.CollectedAt
+		m := res.Snapshot.Metrics
+		niches[i].Measured = Measured{
+			TrendScore: res.Scores.Trend, MomentumPercent: res.Scores.MomentumPercent,
+			DemandScore: res.Scores.Demand, CompetitionScore: res.Scores.Competition,
+			Metrics: &m, CollectedAt: &collected, Sources: []string{trends.SourceYouTube},
+		}
+		measured++
+	}
+	note := fmt.Sprintf("Measured %d of %d niches from the 50 most viewed videos of the last %d days in %s.",
+		measured, len(niches), trends.WindowDays, in.GeoTarget)
+	if failed > 0 {
+		note += fmt.Sprintf(" %d measurement(s) failed.", failed)
+	}
+	if stopReason != "" {
+		note += " " + stopReason
+	}
+	status := "connected"
+	if measured == 0 {
+		status = "unavailable"
+	}
+	return DataSourceStatus{Name: youtubeSourceName, Status: status, Note: note}
 }

@@ -43,6 +43,7 @@ func (e *Engine) Handlers(store ChannelStore) map[string]jobs.Handler {
 			if err := json.Unmarshal(j.Input, &in); err != nil {
 				return nil, jobs.Permanent(fmt.Errorf("decode input: %w", err))
 			}
+			in.OwnerID = j.OwnerID
 			report, err := e.DiscoverNiches(ctx, in)
 			return report, classify(err)
 		},
