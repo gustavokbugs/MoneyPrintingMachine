@@ -52,3 +52,21 @@ func TestLoadValidation(t *testing.T) {
 		t.Error("expected error for missing DATABASE_URL")
 	}
 }
+
+func TestLoadYouTubeDefaults(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("HTTP_ADDR", "127.0.0.1:9090")
+	t.Setenv("GOOGLE_REDIRECT_URL", "")
+	t.Setenv("YOUTUBE_DAILY_QUOTA", "")
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.GoogleRedirectURL != "http://127.0.0.1:9090/api/oauth/youtube/callback" || cfg.YouTubeDailyQuota != 10000 {
+		t.Fatalf("unexpected defaults: %+v", cfg)
+	}
+	t.Setenv("YOUTUBE_DAILY_QUOTA", "0")
+	if _, err := Load(""); err == nil {
+		t.Fatal("expected error for zero quota")
+	}
+}
