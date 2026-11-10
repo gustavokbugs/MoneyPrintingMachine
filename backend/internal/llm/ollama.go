@@ -48,6 +48,9 @@ type Client struct {
 	contextLen int
 }
 
+// DefaultContextTokens is the context window requested from the model.
+const DefaultContextTokens = 8192
+
 // NewClient builds a Client. baseURL must be an http(s) URL; it is expected
 // to point to a local or private-network Ollama instance.
 func NewClient(baseURL, model string, timeout time.Duration) (*Client, error) {
@@ -62,8 +65,17 @@ func NewClient(baseURL, model string, timeout time.Duration) (*Client, error) {
 		baseURL:    u,
 		model:      model,
 		httpClient: &http.Client{Timeout: timeout},
-		contextLen: 8192,
+		contextLen: DefaultContextTokens,
 	}, nil
+}
+
+// WithContextTokens sets the context window. Smaller windows use less GPU
+// memory but can truncate long outputs.
+func (c *Client) WithContextTokens(n int) *Client {
+	if n >= 2048 {
+		c.contextLen = n
+	}
+	return c
 }
 
 // Model returns the configured model name.

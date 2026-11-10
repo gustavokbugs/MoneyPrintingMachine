@@ -62,6 +62,9 @@ func run(log *slog.Logger) error {
 	}
 
 	model, err := llm.NewClient(cfg.OllamaURL, cfg.OllamaModel, cfg.LLMTimeout)
+	if err == nil {
+		model.WithContextTokens(cfg.LLMContextTokens)
+	}
 	if err != nil {
 		return err
 	}

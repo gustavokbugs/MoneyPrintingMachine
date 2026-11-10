@@ -19,6 +19,7 @@ type Config struct {
 	OllamaURL         string
 	OllamaModel       string
 	LLMTimeout        time.Duration
+	LLMContextTokens  int
 	WorkerConcurrency int
 	LocalOwnerID      string
 	WebDist           string
@@ -63,6 +64,9 @@ func Load(envFile string) (Config, error) {
 	}
 	var err error
 	if cfg.LLMTimeout, err = durationEnv("LLM_TIMEOUT", 10*time.Minute); err != nil {
+		return Config{}, err
+	}
+	if cfg.LLMContextTokens, err = intEnv("LLM_CONTEXT_TOKENS", 8192, 2048, 131072); err != nil {
 		return Config{}, err
 	}
 	if cfg.WorkerConcurrency, err = intEnv("WORKER_CONCURRENCY", 1, 1, 8); err != nil {
