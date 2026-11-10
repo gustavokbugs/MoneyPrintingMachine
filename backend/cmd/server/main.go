@@ -74,6 +74,12 @@ func run(log *slog.Logger) error {
 	jobStore := postgres.NewJobStore(pool)
 	engine := launchpad.NewEngine(model)
 
+	yt, err := buildYouTube(cfg, pool, channels, log)
+	if err != nil {
+		return err
+	}
+	engine.WithMeasurer(yt.trends).WithHandleLookup(yt.data)
+
 	runner := jobs.NewRunner(jobStore, engine.Handlers(channels), jobs.RunnerConfig{
 		Concurrency: cfg.WorkerConcurrency,
 		Lease:       cfg.LLMTimeout*3 + time.Minute, // Blueprints make several model calls.
@@ -93,9 +99,14 @@ func run(log *slog.Logger) error {
 			{Name: "database", Check: func(ctx context.Context) error { return pool.Ping(ctx) }},
 			{Name: "local_model", Check: model.Ping},
 		},
-		Model:   cfg.OllamaModel,
-		Log:     log.With("component", "http"),
-		OwnerID: cfg.LocalOwnerID,
+		YouTube:    yt.connections,
+		Trends:     yt.trends,
+		Names:      nameChecker{engine: engine, channels: channels},
+		Quota:      yt.budget,
+		WebBaseURL: cfg.WebBaseURL,
+		Model:      cfg.OllamaModel,
+		Log:        log.With("component", "http"),
+		OwnerID:    cfg.LocalOwnerID,
 	})
 
 	srv := &http.Server{
