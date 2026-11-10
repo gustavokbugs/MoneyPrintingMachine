@@ -1,0 +1,24 @@
+---
+description: PostgreSQL schema, migrations, API contracts, and multi-channel isolation.
+globs:
+  - "**/*.sql"
+  - "**/*migration*"
+  - "**/*schema*"
+  - "**/*repository*"
+  - "**/*handler*"
+  - "**/*route*"
+alwaysApply: false
+---
+
+# Database and API
+
+- Use explicit, versioned migrations; never depend on undocumented manual database edits.
+- Add indexes based on known query patterns and verify expensive query plans when relevant.
+- Prevent N+1 queries and unbounded collection endpoints; paginate large result sets.
+- Define stable API error formats and meaningful status codes.
+- Validate inputs and authorize every operation server-side.
+- Enforce channel/account ownership and tenant boundaries in application or data-access logic.
+- Use transactions for related writes that must remain consistent.
+- Use idempotency keys for external publishing actions where supported.
+- Never expose secrets, OAuth tokens, or provider credentials to the browser.
+- Add migration, repository, authorization, and API tests for meaningful changes.

@@ -1,0 +1,23 @@
+---
+description: Testing strategy, code quality, security, and completion criteria.
+alwaysApply: true
+---
+
+# Quality Gates
+
+For each meaningful change:
+1. Add or update tests for the behavior.
+2. Cover invalid input, failure paths, authorization, and retries where relevant.
+3. Use deterministic fixtures; unit tests must not depend on live third-party APIs.
+4. Run formatters, targeted tests, lint/type-check, and builds using repository scripts.
+5. Inspect the final diff for scope, secrets, generated artifacts, and accidental changes.
+6. Report exact commands and outcomes.
+
+Additional standards:
+- Tests must be deterministic, isolated, and repeatable.
+- Avoid arbitrary sleeps and brittle snapshots.
+- Do not mock internal implementation details when testing behavior.
+- Add regression tests for bug fixes.
+- Do not claim success for checks that were not run.
+- A compiling change is not automatically a complete change.
+- Do not weaken tests, lint rules, types, or security controls merely to make a task pass.

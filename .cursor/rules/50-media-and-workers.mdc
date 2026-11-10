@@ -1,0 +1,26 @@
+---
+description: FFmpeg, rendering, inference, queues, worker reliability, and resource management.
+globs:
+  - "**/*worker*"
+  - "**/*job*"
+  - "**/*render*"
+  - "**/*media*"
+  - "**/*ffmpeg*"
+  - "**/*queue*"
+alwaysApply: false
+---
+
+# Media Pipeline and Workers
+
+- Treat inference and rendering as resource-intensive background work.
+- Bound CPU, GPU, RAM, disk, and worker concurrency; do not assume large models fit the development machine.
+- Inspect model VRAM/RAM requirements and license before integration.
+- Persist meaningful job states; make jobs resumable and idempotent where practical.
+- Support cancellation, timeouts, bounded retries, and clear failure reasons.
+- Cache reusable artifacts with stable content-based keys.
+- Stream large files when possible; avoid loading entire media assets into memory.
+- Validate duration, dimensions, codecs, and file size at upload and processing boundaries.
+- Clean temporary files safely; do not delete user assets as part of generic cleanup.
+- Keep provider/model adapters replaceable and isolate hardware-specific configuration.
+- Use FFmpeg arguments safely; never interpolate untrusted input into shell commands.
+- Test failure recovery, partial outputs, and concurrent job execution.

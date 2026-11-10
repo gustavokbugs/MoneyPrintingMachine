@@ -1,0 +1,23 @@
+---
+description: Atomic Git history, frequent granular commits, and no AI co-author attribution.
+alwaysApply: true
+---
+
+# Git Discipline
+
+The repository owner values granular, traceable history.
+
+- Prefer frequent, small, atomic commits over large catch-all commits.
+- Each commit must represent one independently understandable and reviewable logical change.
+- Split unrelated changes. Do not create meaningless commits that fragment an inseparable change.
+- Stage explicit paths and inspect the staged diff before committing.
+- Use imperative, specific subjects, ideally under 72 characters.
+- Preferred format: `type(scope): imperative summary`.
+- Types: `feat`, `fix`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `perf`.
+- Never add AI co-author trailers or attribution. Do not include `Co-authored-by: Claude`, `Co-authored-by: ChatGPT`, `Co-authored-by: OpenAI`, or equivalent.
+- Preserve the configured Git author identity. Never change `user.name` or `user.email`.
+- Do not commit secrets, `.env` files, model weights, generated media, caches, or build output.
+- Do not amend, rebase, reset, force-push, or push unless explicitly authorized.
+- Do not create commits unless the user requests commits or the active task explicitly authorizes them.
+- Before every commit, inspect `git status` and the staged diff.
+- If asked to commit, create the smallest sensible atomic commits and report each hash and subject.

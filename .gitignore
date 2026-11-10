@@ -1,0 +1,23 @@
+# Repository ignore rules.
+
+.env
+.env.*
+!.env.example
+*.log
+.tmp/
+tmp/
+.cache/
+.cache-*/
+models/
+model-cache/
+generated/
+artifacts/
+renders/
+media-output/
+
+# Build output and dependencies
+node_modules/
+web/dist/
+backend/bin/
+*.exe
+coverage/

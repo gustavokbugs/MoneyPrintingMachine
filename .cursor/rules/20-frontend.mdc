@@ -1,0 +1,23 @@
+---
+description: React and TypeScript frontend quality, accessibility, and API integration.
+globs:
+  - "frontend/**/*.{ts,tsx,js,jsx}"
+  - "web/**/*.{ts,tsx,js,jsx}"
+  - "src/**/*.{ts,tsx,js,jsx}"
+alwaysApply: false
+---
+
+# Frontend
+
+- Respect strict TypeScript. Avoid `any`; prefer `unknown` plus narrowing.
+- Do not suppress type errors with casts or `@ts-ignore` without a documented reason.
+- Keep components focused and compose them from small reusable units.
+- Separate server state, local UI state, and form state.
+- Handle loading, empty, error, and success states explicitly.
+- Use semantic HTML, accessible labels, keyboard support, and visible focus.
+- Avoid effects for derived state; derive during render unless an effect is genuinely required.
+- Avoid premature global state and unnecessary abstractions.
+- Keep API contracts typed; validate untrusted data at boundaries.
+- Do not put business rules exclusively in UI components.
+- Keep user-facing strings in the localization system; default language is English (`en-US`).
+- Test important interactions, error states, and permission boundaries.

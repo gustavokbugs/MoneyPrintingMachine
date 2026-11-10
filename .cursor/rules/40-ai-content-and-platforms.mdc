@@ -1,0 +1,28 @@
+---
+description: AI generation, channel launch, content originality, platform integrations, and monetization safeguards.
+globs:
+  - "**/*content*"
+  - "**/*generation*"
+  - "**/*prompt*"
+  - "**/*channel*"
+  - "**/*publish*"
+  - "**/*platform*"
+  - "**/*analytics*"
+alwaysApply: false
+---
+
+# AI Content and Platform Rules
+
+- The platform's default content language and target audience locale are American English (`en-US`), unless a channel explicitly overrides them.
+- Distinguish internal channel workspace creation from external platform account creation, account connection, profile configuration, publishing, and analytics access.
+- Never report a platform channel/profile as created until verified through an official supported flow or API.
+- Use official APIs and least-privilege OAuth scopes. Respect quotas, review requirements, platform terms, and content policies.
+- When a platform does not support a required action, implement guided manual setup rather than browser automation or policy circumvention.
+- Do not bypass CAPTCHA, rate limits, account restrictions, monetization review, copyright systems, or AI disclosure requirements.
+- Prefer original scripts, distinctive formats, meaningful editing, and editorial value over repetitive mass generation.
+- Track sources for factual claims and provide fact-checking paths.
+- Track provenance and rights for music, footage, images, fonts, and generated assets.
+- Never assume generated output is automatically copyright-safe or commercially usable.
+- Separate measured trend/analytics data from estimates and heuristic scores.
+- Never fabricate views, retention, RPM, revenue, audience geography, trends, or provider success.
+- Require review/approval for uncertain, high-risk, or externally visible actions.

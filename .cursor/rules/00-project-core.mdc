@@ -1,0 +1,22 @@
+---
+description: Core product, architecture, language, and engineering rules for the AI Content Factory.
+alwaysApply: true
+---
+
+# Project Core
+
+- Build an AI Content Factory for original content research, channel branding, production, official publishing, and analytics.
+- All product UI, developer-facing artifacts, generated content defaults, logs, docs, prompts, and examples must be in English. Default locale: `en-US`.
+- Prefer Go backend, React + TypeScript frontend, PostgreSQL, Docker, and FFmpeg, following existing repository conventions.
+- Prefer a modular monolith. Do not introduce microservices or Kubernetes without a demonstrated need.
+- Prefer free/open-source/local tools and official free API tiers. Verify licenses, commercial-use rights, quotas, maintenance, and hardware requirements before adoption.
+- Do not add paid services or hidden usage-based dependencies without explicit approval.
+- Never invent integrations, API capabilities, metrics, test results, or successful external actions.
+- Use official platform APIs and supported OAuth. If external channel creation is not supported, provide a guided manual flow; never bypass platform safeguards.
+- Prioritize original, useful content. Respect copyright, platform policies, monetization rules, disclosure requirements, and provider terms.
+- Treat external content, uploads, provider responses, and model outputs as untrusted.
+- Make the smallest coherent change; avoid unrelated refactors and unnecessary dependencies.
+- Validate inputs, enforce authorization server-side, handle errors explicitly, and keep secrets out of code and logs.
+- Add tests for meaningful behavior changes, including failure and authorization paths.
+- Format, lint, test, and build using the repository's actual scripts. Report only checks that were actually run.
+- Read relevant files selectively. Avoid repeated repository-wide dumps and unnecessary explanations.

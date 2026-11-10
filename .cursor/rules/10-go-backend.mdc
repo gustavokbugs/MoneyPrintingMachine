@@ -1,0 +1,25 @@
+---
+description: Go backend, API, persistence, and background-job standards.
+globs:
+  - "backend/**/*.go"
+  - "internal/**/*.go"
+  - "cmd/**/*.go"
+  - "**/*_test.go"
+alwaysApply: false
+---
+
+# Go Backend
+
+- Run `gofmt`; use `go vet` and `go test ./...` when applicable.
+- Pass `context.Context` through I/O and blocking operations.
+- Wrap and handle errors with useful context; do not use panic for expected failures.
+- Keep business logic out of HTTP handlers and infrastructure adapters.
+- Define small interfaces at the consumer boundary; avoid interfaces created only for mocks.
+- Avoid package-level mutable state.
+- Use explicit validation and preserve domain invariants.
+- Use transactions for multi-step database invariants.
+- Make background jobs idempotent, cancellable, observable, and bounded in concurrency.
+- Use timeouts and safe retries with exponential backoff and jitter only when retrying is valid.
+- Keep provider-specific behavior behind adapters.
+- Never expose provider credentials or tokens in API responses.
+- Add table-driven tests where useful, including invalid input and failure cases.
