@@ -187,3 +187,29 @@ func TestMeasureErrors(t *testing.T) {
 		t.Fatalf("expected quota error to propagate, got %v", err)
 	}
 }
+
+func TestTrajectory(t *testing.T) {
+	store := &memStore{}
+	base := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	for i, vpd := range []float64{100, 120, 200} {
+		_ = store.Save(context.Background(), "alice", &Snapshot{Source: SourceYouTube, QueryKey: "space", Region: "US", Language: "en-US",
+			Metrics: Metrics{SampleSize: 50, MedianViewsPerDay: vpd}, CollectedAt: base.Add(time.Duration(i) * 24 * time.Hour)})
+	}
+	// memStore.History returns insertion order; reverse it to newest first like the real store.
+	for i, j := 0, len(store.snaps)-1; i < j; i, j = i+1, j-1 {
+		store.snaps[i], store.snaps[j] = store.snaps[j], store.snaps[i]
+	}
+	pts, err := NewService(&fakeYT{key: true}, store).Trajectory(context.Background(), "alice", "space", "US", "en-US")
+	if err != nil || len(pts) != 3 {
+		t.Fatalf("points: %+v %v", pts, err)
+	}
+	if pts[0].Scores.MomentumPercent != nil {
+		t.Fatal("the oldest point has no baseline")
+	}
+	if *pts[1].Scores.MomentumPercent != 20 || *pts[2].Scores.MomentumPercent != 66.67 {
+		t.Fatalf("momentum: %v %v", *pts[1].Scores.MomentumPercent, *pts[2].Scores.MomentumPercent)
+	}
+	if !pts[0].CollectedAt.Before(pts[2].CollectedAt) {
+		t.Fatal("points must be oldest first")
+	}
+}

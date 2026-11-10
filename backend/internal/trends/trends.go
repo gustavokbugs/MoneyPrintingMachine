@@ -324,3 +324,37 @@ func (s *Service) History(ctx context.Context, ownerID, query, region, language 
 	}
 	return s.store.History(ctx, ownerID, SourceYouTube, QueryKey(query), strings.ToUpper(region), language, limit)
 }
+
+// Point is one measurement in a query's trajectory.
+type Point struct {
+	CollectedAt       time.Time `json:"collectedAt"`
+	MedianViewsPerDay float64   `json:"medianViewsPerDay"`
+	SampleSize        int       `json:"sampleSize"`
+	Scores            Scores    `json:"scores"`
+}
+
+// Trajectory returns up to 30 measurements oldest first, each scored
+// against the nearest earlier snapshot at least MinMomentumGap older.
+func (s *Service) Trajectory(ctx context.Context, ownerID, query, region, language string) ([]Point, error) {
+	snaps, err := s.History(ctx, ownerID, query, region, language, 30)
+	if err != nil {
+		return nil, err
+	}
+	// History is newest first; walk oldest first.
+	points := make([]Point, 0, len(snaps))
+	for i := len(snaps) - 1; i >= 0; i-- {
+		cur := snaps[i]
+		var prev *Metrics
+		for j := i + 1; j < len(snaps); j++ {
+			if cur.CollectedAt.Sub(snaps[j].CollectedAt) >= s.MinMomentumGap {
+				prev = &snaps[j].Metrics
+				break
+			}
+		}
+		points = append(points, Point{
+			CollectedAt: cur.CollectedAt, MedianViewsPerDay: cur.Metrics.MedianViewsPerDay,
+			SampleSize: cur.Metrics.SampleSize, Scores: ComputeScores(cur.Metrics, prev),
+		})
+	}
+	return points, nil
+}
