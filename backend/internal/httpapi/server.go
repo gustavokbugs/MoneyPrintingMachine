@@ -29,9 +29,10 @@ type SavedNiches interface {
 	Delete(ctx context.Context, ownerID, id string) error
 }
 
-// Connections lists a channel's platform connections.
+// Connections reads platform connections.
 type Connections interface {
 	ListForChannel(ctx context.Context, ownerID, channelID string) ([]platforms.Connection, error)
+	VerifiedPlatforms(ctx context.Context, ownerID string, channelIDs []string) (map[string][]string, error)
 }
 
 // HealthCheck reports the status of one dependency.

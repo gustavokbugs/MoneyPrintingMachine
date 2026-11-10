@@ -79,6 +79,15 @@ func (noConnections) ListForChannel(context.Context, string, string) ([]platform
 	return []platforms.Connection{}, nil
 }
 
+// VerifiedPlatforms reports the first listed channel as connected so list
+// responses can be checked.
+func (noConnections) VerifiedPlatforms(_ context.Context, _ string, ids []string) (map[string][]string, error) {
+	if len(ids) > 0 {
+		return map[string][]string{ids[0]: {"youtube"}}, nil
+	}
+	return map[string][]string{}, nil
+}
+
 type memJobs struct {
 	mu      sync.Mutex
 	created []jobs.NewJob
@@ -182,6 +191,9 @@ func TestCreateAndGetChannel(t *testing.T) {
 	rec = do(t, h, "GET", "/api/channels", "")
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), c.ID) {
 		t.Fatalf("list: %d %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"connectedPlatforms":["youtube"]`) {
+		t.Fatalf("list must include verified platforms: %s", rec.Body.String())
 	}
 }
 

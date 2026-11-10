@@ -113,3 +113,23 @@ func TestConnectionStore(t *testing.T) {
 		t.Fatal("connection not deleted")
 	}
 }
+
+func TestVerifiedPlatforms(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	chRepo := NewChannelRepository(pool)
+	c1, _ := channel.NewDraft("alice", "Space", "", "")
+	c2, _ := channel.NewDraft("alice", "History", "", "")
+	_ = chRepo.Create(ctx, c1)
+	_ = chRepo.Create(ctx, c2)
+	s := NewConnectionStore(pool)
+	_ = s.Upsert(ctx, &connections.Record{OwnerID: "alice", ChannelID: c1.ID, Platform: "youtube", Status: "verified", ExternalID: "UC1"})
+	_ = s.Upsert(ctx, &connections.Record{OwnerID: "alice", ChannelID: c2.ID, Platform: "youtube", Status: "authorized"})
+	got, err := NewPlatformConnectionRepository(pool).VerifiedPlatforms(ctx, "alice", []string{c1.ID, c2.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got[c1.ID]) != 1 || got[c1.ID][0] != "youtube" || len(got[c2.ID]) != 0 {
+		t.Fatalf("unexpected verified platforms: %v", got)
+	}
+}

@@ -27,9 +27,12 @@ type channelResponse struct {
 	Strategy           *channel.Strategy  `json:"strategy"`
 	Identity           *channel.Identity  `json:"identity"`
 	Blueprint          *channel.Blueprint `json:"blueprint"`
-	Version            int                `json:"version"`
-	CreatedAt          time.Time          `json:"createdAt"`
-	UpdatedAt          time.Time          `json:"updatedAt"`
+	// ConnectedPlatforms lists platforms with a verified connection. It is
+	// included only in list responses; omitted means none.
+	ConnectedPlatforms []string  `json:"connectedPlatforms,omitempty"`
+	Version            int       `json:"version"`
+	CreatedAt          time.Time `json:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt"`
 }
 
 func toResponse(c *channel.Channel) channelResponse {
@@ -58,9 +61,20 @@ func (s *server) listChannels(w http.ResponseWriter, r *http.Request) {
 		s.writeDomainError(w, r, err)
 		return
 	}
+	ids := make([]string, 0, len(items))
+	for _, it := range items {
+		ids = append(ids, it.ID)
+	}
+	verified, err := s.Connections.VerifiedPlatforms(r.Context(), s.OwnerID, ids)
+	if err != nil {
+		s.writeDomainError(w, r, err)
+		return
+	}
 	out := make([]channelResponse, 0, len(items))
 	for i := range items {
-		out = append(out, toResponse(&items[i]))
+		resp := toResponse(&items[i])
+		resp.ConnectedPlatforms = verified[items[i].ID]
+		out = append(out, resp)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": out, "nextCursor": next})
 }

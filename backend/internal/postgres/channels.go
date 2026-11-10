@@ -264,3 +264,27 @@ func (r *PlatformConnectionRepository) ListForChannel(ctx context.Context, owner
 	}
 	return out, rows.Err()
 }
+
+// VerifiedPlatforms returns the verified platforms of each channel in one
+// query, keyed by channel ID.
+func (r *PlatformConnectionRepository) VerifiedPlatforms(ctx context.Context, ownerID string, channelIDs []string) (map[string][]string, error) {
+	out := map[string][]string{}
+	if len(channelIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.pool.Query(ctx, `SELECT channel_id::text, platform FROM platform_connections
+		WHERE owner_id = $1 AND channel_id = ANY($2::uuid[]) AND status = 'verified'
+		ORDER BY platform`, ownerID, channelIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list verified platforms: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, platform string
+		if err := rows.Scan(&id, &platform); err != nil {
+			return nil, fmt.Errorf("scan verified platform: %w", err)
+		}
+		out[id] = append(out[id], platform)
+	}
+	return out, rows.Err()
+}
