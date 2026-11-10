@@ -11,12 +11,18 @@ import type {
   ChannelStatus,
   Health,
   Identity,
+  Feed,
+  Integrations,
   Job,
   LaunchReview,
   PlatformCapability,
   PlatformConnection,
   SavedNiche,
   Strategy,
+  TrendResult,
+  TrendPoint,
+  TrendSnapshot,
+  Watch,
 } from "./types";
 
 /** ApiError carries the server's stable error code and message. */
@@ -124,6 +130,59 @@ export const api = {
   deleteSavedNiche: async (id: string) => {
     await request("DELETE", `/api/launchpad/saved-niches/${encodeURIComponent(id)}`);
   },
+
+  integrations: async () =>
+    asRecordOf<Integrations>("integrations", ["youtubeDataApi", "youtubeOAuth"])(await request("GET", "/api/integrations")),
+  measureTrend: async (query: string, region: string, language: string) =>
+    asRecordOf<TrendResult>("trend result", ["snapshot", "scores"])(
+      await request("POST", "/api/trends/measure", { query, region, language }),
+    ),
+  trendHistory: async (query: string, region: string, language: string) =>
+    asItems(
+      await request("GET", `/api/trends/history?${new URLSearchParams({ query, region, language }).toString()}`),
+      asRecordOf<TrendSnapshot>("trend snapshot", ["metrics", "collectedAt"]),
+    ),
+  checkNames: async (id: string) => {
+    const data = await request("POST", `/api/channels/${encodeURIComponent(id)}/identity/check-names`);
+    if (!isRecord(data)) throw new ApiError(0, "invalid_response", "The server returned an invalid response.");
+    return {
+      channel: asChannel(data.channel),
+      complete: data.complete === true,
+      warning: typeof data.warning === "string" ? data.warning : null,
+    };
+  },
+  startYouTube: async (id: string) => {
+    const data = await request("POST", `/api/channels/${encodeURIComponent(id)}/connections/youtube/start`);
+    if (!isRecord(data) || typeof data.authorizationUrl !== "string" || !data.authorizationUrl.startsWith("https://accounts.google.com/")) {
+      throw new ApiError(0, "invalid_response", "The server returned an unexpected authorization URL.");
+    }
+    return data.authorizationUrl;
+  },
+  verifyYouTube: async (id: string) =>
+    asRecordOf<PlatformConnection>("connection", ["platform", "status"])(
+      await request("POST", `/api/channels/${encodeURIComponent(id)}/connections/youtube/verify`),
+    ),
+  disconnectYouTube: async (id: string) => {
+    await request("DELETE", `/api/channels/${encodeURIComponent(id)}/connections/youtube`);
+  },
+
+  watchlist: async () => asItems(await request("GET", "/api/trends/watchlist"), asRecordOf<Watch>("watch", ["id", "query"])),
+  addWatch: async (query: string, region: string) =>
+    asRecordOf<Watch>("watch", ["id", "query"])(await request("POST", "/api/trends/watchlist", { query, region, language: "en-US" })),
+  deleteWatch: async (id: number) => {
+    await request("DELETE", `/api/trends/watchlist/${id}`);
+  },
+  trajectory: async (w: Pick<Watch, "query" | "region" | "language">) =>
+    asItems(
+      await request("GET", `/api/trends/trajectory?${new URLSearchParams({ query: w.query, region: w.region, language: w.language }).toString()}`),
+      asRecordOf<TrendPoint>("trend point", ["collectedAt", "scores"]),
+    ),
+  feeds: async () => asItems(await request("GET", "/api/trends/feeds"), asRecordOf<Feed>("feed", ["id", "url", "lastStatus"])),
+  addFeed: async (url: string) => asRecordOf<Feed>("feed", ["id", "url"])(await request("POST", "/api/trends/feeds", { url })),
+  deleteFeed: async (id: number) => {
+    await request("DELETE", `/api/trends/feeds/${id}`);
+  },
+  refreshTrends: async (key: string) => asJob(await request("POST", "/api/trends/refresh", undefined, idem(key))),
 
   platforms: async () =>
     asItems(await request("GET", "/api/platforms"), asRecordOf<PlatformCapability>("platform", ["platform", "steps"])),

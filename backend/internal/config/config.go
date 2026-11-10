@@ -22,6 +22,17 @@ type Config struct {
 	WorkerConcurrency int
 	LocalOwnerID      string
 	WebDist           string
+	WebBaseURL        string
+
+	// YouTube Data API key for public data (trends, handle checks).
+	YouTubeAPIKey     string
+	YouTubeDailyQuota int
+	// Google OAuth client for channel connections.
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleRedirectURL  string
+	// TokenEncryptionKey is a base64 32-byte key for stored OAuth tokens.
+	TokenEncryptionKey string
 }
 
 // Load reads configuration. Values already present in the environment take
@@ -39,7 +50,14 @@ func Load(envFile string) (Config, error) {
 		OllamaModel:  getenv("OLLAMA_MODEL", "qwen3:4b"),
 		LocalOwnerID: getenv("LOCAL_OWNER_ID", "local"),
 		WebDist:      os.Getenv("WEB_DIST"),
+		WebBaseURL:   getenv("WEB_BASE_URL", "http://127.0.0.1:5173"),
+
+		YouTubeAPIKey:      strings.TrimSpace(os.Getenv("YOUTUBE_API_KEY")),
+		GoogleClientID:     strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID")),
+		GoogleClientSecret: strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET")),
+		TokenEncryptionKey: strings.TrimSpace(os.Getenv("TOKEN_ENCRYPTION_KEY")),
 	}
+	cfg.GoogleRedirectURL = getenv("GOOGLE_REDIRECT_URL", "http://"+cfg.HTTPAddr+"/api/oauth/youtube/callback")
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required (see .env.example)")
 	}
@@ -48,6 +66,9 @@ func Load(envFile string) (Config, error) {
 		return Config{}, err
 	}
 	if cfg.WorkerConcurrency, err = intEnv("WORKER_CONCURRENCY", 1, 1, 8); err != nil {
+		return Config{}, err
+	}
+	if cfg.YouTubeDailyQuota, err = intEnv("YOUTUBE_DAILY_QUOTA", 10000, 1, 1_000_000); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil

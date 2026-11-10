@@ -8,8 +8,12 @@ import (
 	"net/http"
 
 	"contentfactory/internal/channel"
+	"contentfactory/internal/connections"
 	"contentfactory/internal/jobs"
 	"contentfactory/internal/launchpad"
+	"contentfactory/internal/rss"
+	"contentfactory/internal/trends"
+	"contentfactory/internal/youtube"
 )
 
 // maxBodyBytes bounds request bodies. Blueprints are the largest payloads.
@@ -84,6 +88,32 @@ func (s *server) writeDomainError(w http.ResponseWriter, r *http.Request, err er
 		writeError(w, http.StatusNotFound, "saved_niche_not_found", "Saved niche not found.")
 	case errors.Is(err, launchpad.ErrSavedNicheExists):
 		writeError(w, http.StatusConflict, "saved_niche_exists", err.Error())
+	case errors.Is(err, connections.ErrNotFound):
+		writeError(w, http.StatusNotFound, "connection_not_found", "This channel has no YouTube connection.")
+	case errors.Is(err, connections.ErrStateInvalid):
+		writeError(w, http.StatusBadRequest, "invalid_state", err.Error())
+	case errors.Is(err, connections.ErrExternalInUse):
+		writeError(w, http.StatusConflict, "account_in_use", err.Error())
+	case errors.Is(err, youtube.ErrNotConfigured):
+		writeError(w, http.StatusServiceUnavailable, "integration_not_configured", "The YouTube integration is not configured.")
+	case errors.Is(err, youtube.ErrQuotaBudget), errors.Is(err, youtube.ErrQuotaExceeded):
+		writeError(w, http.StatusTooManyRequests, "quota_exhausted", "The daily YouTube API quota is used up. It resets at midnight Pacific time.")
+	case errors.Is(err, youtube.ErrUnauthorized):
+		writeError(w, http.StatusBadGateway, "upstream_unauthorized", "YouTube rejected the credentials. Check the API key or reconnect the account.")
+	case errors.Is(err, youtube.ErrUnavailable):
+		writeError(w, http.StatusBadGateway, "upstream_unavailable", "YouTube could not be reached. Try again shortly.")
+	case errors.Is(err, trends.ErrInvalidQuery):
+		writeFieldError(w, http.StatusUnprocessableEntity, "validation_failed", err.Error(), "query")
+	case errors.Is(err, trends.ErrWatchNotFound):
+		writeError(w, http.StatusNotFound, "watch_not_found", "Watched query not found. Channel niches are managed by their channels.")
+	case errors.Is(err, rss.ErrFeedNotFound):
+		writeError(w, http.StatusNotFound, "feed_not_found", "Feed not found.")
+	case errors.Is(err, rss.ErrFeedExists), errors.Is(err, rss.ErrTooManyFeeds):
+		writeError(w, http.StatusConflict, "feed_conflict", err.Error())
+	case errors.Is(err, rss.ErrInvalidURL):
+		writeFieldError(w, http.StatusUnprocessableEntity, "validation_failed", err.Error(), "url")
+	case errors.Is(err, launchpad.ErrPrecondition):
+		writeError(w, http.StatusConflict, "precondition_failed", err.Error())
 	default:
 		s.Log.Error("request failed", "path", r.URL.Path, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal", "An unexpected error occurred.")

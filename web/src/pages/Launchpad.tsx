@@ -1,10 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Compass, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, newIdempotencyKey } from "../api/client";
 import { asNicheReport } from "../api/guards";
 import type { Niche, NicheReport } from "../api/types";
-import { Empty, ErrorState, JobProgress, Loading, RatingChip, Section, StatusBadge, TagList, errorMessage } from "../components/ui";
+import { useConfirm, useToast } from "../components/feedback";
+import { sortNiches, type NicheSort } from "../components/Measured";
+import { NicheCard, heuristicKeys } from "../components/NicheCard";
+import { Badge, Button, Empty, ErrorState, JobProgress, Notice, RatingChip, Section, Skeleton, StatusBadge, errorMessage } from "../components/ui";
 import { useJob } from "../hooks/useJob";
 import { formatDateTime, t, type MessageKey } from "../i18n";
 
@@ -26,15 +30,6 @@ function writeLastJob(id: string) {
   }
 }
 
-const heuristicKeys = [
-  "audiencePotential",
-  "monetizationPotential",
-  "competitionEstimate",
-  "productionDifficulty",
-  "sourceAvailability",
-  "originalityPotential",
-] as const;
-
 function parseReport(result: unknown): NicheReport | null {
   try {
     return asNicheReport(result);
@@ -43,17 +38,22 @@ function parseReport(result: unknown): NicheReport | null {
   }
 }
 
+const sourceTone = { connected: "success", not_configured: "warning", unavailable: "neutral" } as const;
+
 export function Launchpad() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [jobId, setJobId] = useState<string | null>(readLastJob);
   const [query, setQuery] = useState("");
   const [manualNiche, setManualNiche] = useState("");
   const [compare, setCompare] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<NicheSort>("heuristic");
 
   const job = useJob(jobId);
   const report = job.data?.status === "succeeded" ? parseReport(job.data.result) : null;
-
+  const integrations = useQuery({ queryKey: ["integrations"], queryFn: api.integrations, refetchInterval: 60_000 });
   const saved = useQuery({ queryKey: ["savedNiches"], queryFn: api.listSavedNiches });
   const channels = useQuery({ queryKey: ["channels"], queryFn: () => api.listChannels() });
 
@@ -70,25 +70,31 @@ export function Launchpad() {
     mutationFn: (niche: string) => api.createChannel({ niche }),
     onSuccess: (c) => {
       void qc.invalidateQueries({ queryKey: ["channels"] });
+      toast.success(t("launchpad.created", { niche: c.niche }));
       navigate(`/channels/${c.id}?step=strategy`);
     },
+    onError: (err) => toast.error(errorMessage(err)),
   });
 
   const save = useMutation({
     mutationFn: (n: Niche) => api.saveNiche(n.name, n.description, n),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["savedNiches"] }),
+    onSuccess: (n) => {
+      void qc.invalidateQueries({ queryKey: ["savedNiches"] });
+      toast.success(t("launchpad.savedToast", { name: n.name }));
+    },
+    onError: (err) => toast.error(errorMessage(err)),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => api.deleteSavedNiche(id),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["savedNiches"] }),
+    onError: (err) => toast.error(errorMessage(err)),
   });
 
   const savedNames = new Set((saved.data ?? []).map((s) => s.name.toLowerCase()));
-  const inProgress = (channels.data?.items ?? []).filter((c) =>
-    ["draft", "branding", "awaiting_platform_setup", "ready"].includes(c.status),
-  );
+  const inProgress = (channels.data?.items ?? []).filter((c) => ["draft", "branding", "awaiting_platform_setup", "ready"].includes(c.status));
   const busy = discover.isPending || job.data?.status === "queued" || job.data?.status === "running";
+  const quota = integrations.data?.youtubeDataApi.quota;
 
   const onSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -103,7 +109,13 @@ export function Launchpad() {
       return next;
     });
 
+  const deleteSaved = async (id: string, name: string) => {
+    const ok = await confirm({ title: t("launchpad.deleteTitle"), body: t("launchpad.deleteBody", { name }), confirmLabel: t("common.delete"), tone: "danger" });
+    if (ok) remove.mutate(id);
+  };
+
   const compared = report?.niches.filter((n) => compare.has(n.name)) ?? [];
+  const sorted = report ? sortNiches(report.niches, sortBy) : [];
 
   return (
     <>
@@ -112,130 +124,95 @@ export function Launchpad() {
           <h1>{t("launchpad.title")}</h1>
           <p className="muted">{t("launchpad.subtitle")}</p>
         </div>
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => discover.mutate("")}>
+        <Button variant="primary" icon={Sparkles} loading={discover.isPending} disabled={busy} onClick={() => discover.mutate("")}>
           {t("launchpad.discover")}
-        </button>
+        </Button>
       </div>
 
       <div className="grid-2">
         <div className="stack">
-          <Section title={t("launchpad.recommended")}>
-            <form className="inline-form" onSubmit={onSearch}>
+          <Section title={t("launchpad.recommended")} description={t("launchpad.recommendedHelp")}>
+            <form onSubmit={onSearch} className="field-group" role="search">
               <label htmlFor="niche-search">{t("launchpad.searchLabel")}</label>
-              <div className="row">
-                <input
-                  id="niche-search"
-                  value={query}
-                  maxLength={200}
-                  placeholder={t("launchpad.searchPlaceholder")}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                <button type="submit" className="btn btn-secondary" disabled={busy || !query.trim()}>
+              <div className="input-row">
+                <input id="niche-search" value={query} maxLength={200} placeholder={t("launchpad.searchPlaceholder")} onChange={(e) => setQuery(e.target.value)} />
+                <Button type="submit" icon={Search} disabled={busy || !query.trim()}>
                   {t("launchpad.search")}
-                </button>
+                </Button>
               </div>
             </form>
 
             {discover.isError && <ErrorState error={discover.error} />}
-            {jobId === null && !discover.isPending && <Empty>{t("launchpad.noReport")}</Empty>}
-            {jobId !== null && job.data?.status !== "succeeded" && <JobProgress job={job.data} error={job.error} />}
+            {jobId === null && !discover.isPending && (
+              <Empty icon={Compass}>
+                <p>{t("launchpad.noReport")}</p>
+              </Empty>
+            )}
+            {jobId !== null && job.data?.status !== "succeeded" && (
+              <>
+                <JobProgress job={job.data} error={job.error} />
+                {job.data?.status !== "failed" && (
+                  <div className="stack-sm" aria-hidden="true">
+                    <Skeleton height={120} />
+                    <Skeleton height={120} />
+                  </div>
+                )}
+              </>
+            )}
             {job.data?.status === "succeeded" && !report && <ErrorState error={new Error(t("app.invalidReport"))} />}
 
             {report && (
               <>
-                <div className="alert alert-info">
-                  <strong>{t("launchpad.basisTitle")}</strong>
-                  <p className="small">{report.basis}</p>
-                  <p className="small muted">
+                <Notice tone="info" title={t("launchpad.basisTitle")}>
+                  <p>{report.basis}</p>
+                  <p className="xs">
                     {report.model} · {formatDateTime(report.generatedAt)}
                   </p>
+                </Notice>
+                <div className="row wrap between">
+                  <div className="row">
+                    <label htmlFor="niche-sort">{t("launchpad.sortBy")}</label>
+                    <select id="niche-sort" value={sortBy} onChange={(e) => setSortBy(e.target.value as NicheSort)}>
+                      <option value="heuristic">{t("launchpad.sort.heuristic")}</option>
+                      <option value="demand">{t("launchpad.sort.demand")}</option>
+                      <option value="competition">{t("launchpad.sort.competition")}</option>
+                    </select>
+                  </div>
+                  {quota && <span className="small muted tabular">{t("launchpad.quota", { used: quota.usedToday, limit: quota.limit })}</span>}
                 </div>
                 <ol className="niche-list">
-                  {report.niches.map((n) => (
-                    <li key={n.name} className="niche">
-                      <div className="niche-head">
-                        <h3>{n.name}</h3>
-                        <div className="score" title={t("common.estimate")}>
-                          <span className="score-value">{n.heuristicScore}</span>
-                          <span className="small muted">{t("launchpad.heuristicScore")}</span>
-                        </div>
-                      </div>
-                      <p>{n.description}</p>
-                      <p className="small muted">{n.rationale}</p>
-                      <dl className="ratings">
-                        {heuristicKeys.map((k) => (
-                          <div key={k}>
-                            <dt>{t(`heuristic.${k}` as MessageKey)}</dt>
-                            <dd>
-                              <RatingChip rating={n.heuristics[k]} />
-                            </dd>
-                          </div>
-                        ))}
-                        <div>
-                          <dt>{t("launchpad.measuredTrend")}</dt>
-                          <dd className="muted">{n.measured.trendScore ?? t("common.notMeasured")}</dd>
-                        </div>
-                        <div>
-                          <dt>{t("launchpad.measuredCompetition")}</dt>
-                          <dd className="muted">{n.measured.competitionScore ?? t("common.notMeasured")}</dd>
-                        </div>
-                      </dl>
-                      <details>
-                        <summary>{t("launchpad.subNiches")}</summary>
-                        <TagList items={n.subNiches} />
-                        <h4>{t("launchpad.opportunities")}</h4>
-                        <TagList items={n.contentOpportunities} />
-                        <h4>{t("launchpad.formats")}</h4>
-                        <TagList items={n.suggestedFormats} />
-                      </details>
-                      <div className="row wrap">
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          disabled={create.isPending}
-                          onClick={() => create.mutate(n.name)}
-                        >
-                          {t("launchpad.select")}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          disabled={busy}
-                          onClick={() => {
-                            setQuery(n.name);
-                            discover.mutate(n.name);
-                          }}
-                        >
-                          {t("launchpad.exploreSub")}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          disabled={savedNames.has(n.name.toLowerCase()) || save.isPending}
-                          onClick={() => save.mutate(n)}
-                        >
-                          {savedNames.has(n.name.toLowerCase()) ? t("launchpad.saved") : t("launchpad.save")}
-                        </button>
-                        <label className="check">
-                          <input type="checkbox" checked={compare.has(n.name)} onChange={() => toggleCompare(n.name)} />
-                          {t("launchpad.compare")}
-                        </label>
-                      </div>
-                    </li>
+                  {sorted.map((n, i) => (
+                    <NicheCard
+                      key={n.name}
+                      niche={n}
+                      rank={i + 1}
+                      saved={savedNames.has(n.name.toLowerCase())}
+                      compared={compare.has(n.name)}
+                      busy={busy}
+                      creating={create.isPending && create.variables === n.name}
+                      onSelect={() => create.mutate(n.name)}
+                      onExplore={() => {
+                        setQuery(n.name);
+                        discover.mutate(n.name);
+                      }}
+                      onSave={() => save.mutate(n)}
+                      onToggleCompare={() => toggleCompare(n.name)}
+                    />
                   ))}
                 </ol>
-                {create.isError && <ErrorState error={create.error} />}
-                {save.isError && <p className="error-text">{errorMessage(save.error)}</p>}
 
-                <h3>{t("launchpad.sourcesTitle")}</h3>
-                <ul className="source-list">
-                  {report.dataSources.map((ds) => (
-                    <li key={ds.name}>
-                      <strong>{ds.name}</strong> <span className={`chip chip-source-${ds.status}`}>{ds.status.replace("_", " ")}</span>
-                      <span className="small muted"> {ds.note}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="stack-sm">
+                  <h3>{t("launchpad.sourcesTitle")}</h3>
+                  <ul className="source-list">
+                    {report.dataSources.map((ds) => (
+                      <li key={ds.name}>
+                        <strong className="small">{ds.name}</strong>
+                        <Badge tone={sourceTone[ds.status]}>{t(`source.${ds.status}` as MessageKey)}</Badge>
+                        <span className="small muted">{ds.note}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </>
             )}
           </Section>
@@ -243,13 +220,14 @@ export function Launchpad() {
           {report && (
             <Section title={t("launchpad.compareTitle")}>
               {compared.length < 2 ? (
-                <p className="muted">{t("launchpad.compareHint")}</p>
+                <p className="muted small">{t("launchpad.compareHint")}</p>
               ) : (
                 <div className="table-wrap">
                   <table>
+                    <caption className="sr-only">{t("launchpad.compareTitle")}</caption>
                     <thead>
                       <tr>
-                        <th scope="col" />
+                        <th scope="col">{t("launchpad.metric")}</th>
                         {compared.map((n) => (
                           <th scope="col" key={n.name}>
                             {n.name}
@@ -261,7 +239,25 @@ export function Launchpad() {
                       <tr>
                         <th scope="row">{t("launchpad.heuristicScore")}</th>
                         {compared.map((n) => (
-                          <td key={n.name}>{n.heuristicScore}</td>
+                          <td key={n.name} className="tabular">
+                            {n.heuristicScore}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <th scope="row">{t("launchpad.demand")}</th>
+                        {compared.map((n) => (
+                          <td key={n.name} className="tabular">
+                            {n.measured.demandScore ?? "—"}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr>
+                        <th scope="row">{t("launchpad.competition")}</th>
+                        {compared.map((n) => (
+                          <td key={n.name} className="tabular">
+                            {n.measured.competitionScore ?? "—"}
+                          </td>
                         ))}
                       </tr>
                       {heuristicKeys.map((k) => (
@@ -282,39 +278,39 @@ export function Launchpad() {
           )}
         </div>
 
-        <aside className="stack">
-          <Section title={t("launchpad.manualTitle")}>
+        <aside className="stack" aria-label={t("launchpad.sidebar")}>
+          <Section title={t("launchpad.manualTitle")} description={t("launchpad.manualHelp")}>
             <form
-              className="inline-form"
+              className="field-group"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (manualNiche.trim()) create.mutate(manualNiche.trim());
               }}
             >
               <label htmlFor="manual-niche">{t("launchpad.manualLabel")}</label>
-              <div className="row">
+              <div className="input-row">
                 <input id="manual-niche" value={manualNiche} maxLength={120} onChange={(e) => setManualNiche(e.target.value)} />
-                <button type="submit" className="btn btn-primary" disabled={!manualNiche.trim() || create.isPending}>
+                <Button type="submit" variant="secondary" icon={Plus} loading={create.isPending && create.variables === manualNiche.trim()} disabled={!manualNiche.trim()}>
                   {t("launchpad.manualCreate")}
-                </button>
+                </Button>
               </div>
             </form>
           </Section>
 
           <Section title={t("launchpad.savedTitle")}>
-            {saved.isPending && <Loading />}
+            {saved.isPending && <Skeleton height={40} />}
             {saved.isError && <ErrorState error={saved.error} onRetry={() => void saved.refetch()} />}
-            {saved.isSuccess && saved.data.length === 0 && <p className="muted">{t("launchpad.savedEmpty")}</p>}
+            {saved.isSuccess && saved.data.length === 0 && <p className="muted small">{t("launchpad.savedEmpty")}</p>}
             <ul className="plain-list">
               {saved.data?.map((s) => (
-                <li key={s.id} className="row between">
-                  <span>{s.name}</span>
+                <li key={s.id} className="row between wrap">
+                  <span className="small">{s.name}</span>
                   <span className="row">
-                    <button type="button" className="btn btn-ghost" onClick={() => create.mutate(s.name)}>
+                    <Button size="sm" variant="ghost" icon={Plus} onClick={() => create.mutate(s.name)}>
                       {t("launchpad.manualCreate")}
-                    </button>
-                    <button type="button" className="btn btn-ghost" onClick={() => remove.mutate(s.id)}>
-                      {t("common.delete")}
+                    </Button>
+                    <button type="button" className="btn btn-danger-ghost btn-sm btn-icon" aria-label={t("launchpad.deleteSaved", { name: s.name })} onClick={() => void deleteSaved(s.id, s.name)}>
+                      <Trash2 size={16} aria-hidden="true" />
                     </button>
                   </span>
                 </li>
@@ -323,12 +319,14 @@ export function Launchpad() {
           </Section>
 
           <Section title={t("launchpad.channelsInProgress")}>
-            {channels.isPending && <Loading />}
-            {inProgress.length === 0 && channels.isSuccess && <p className="muted">{t("common.none")}</p>}
+            {channels.isPending && <Skeleton height={40} />}
+            {inProgress.length === 0 && channels.isSuccess && <p className="muted small">{t("common.none")}</p>}
             <ul className="plain-list">
               {inProgress.map((c) => (
-                <li key={c.id} className="row between">
-                  <Link to={`/channels/${c.id}`}>{c.name || c.niche || t("dashboard.untitled")}</Link>
+                <li key={c.id} className="row between wrap">
+                  <Link to={`/channels/${c.id}`} className="small">
+                    {c.name || c.niche || t("dashboard.untitled")}
+                  </Link>
                   <StatusBadge status={c.status} />
                 </li>
               ))}

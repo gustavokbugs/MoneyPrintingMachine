@@ -47,10 +47,14 @@ export interface Strategy {
   provenance: Provenance;
 }
 
+export type NameAvailability = "not_checked" | "handle_taken" | "no_channel_with_handle" | "invalid_handle";
+
 export interface NameSuggestion {
   name: string;
   rationale: string;
-  availability: string;
+  availability: NameAvailability | "";
+  handle?: string;
+  checkedAt?: string;
 }
 
 export interface Palette {
@@ -112,6 +116,8 @@ export interface Channel {
   strategy: Strategy | null;
   identity: Identity | null;
   blueprint: Blueprint | null;
+  /** Present only in list responses; omitted means no verified platform. */
+  connectedPlatforms?: string[];
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -152,8 +158,13 @@ export interface Niche {
   heuristicScore: number;
   measured: {
     trendScore: number | null;
+    momentumPercent: number | null;
+    demandScore: number | null;
     competitionScore: number | null;
     searchInterest: number | null;
+    metrics: TrendMetrics | null;
+    collectedAt: string | null;
+    news: MentionStats | null;
     sources: string[];
   };
 }
@@ -222,4 +233,96 @@ export interface Health {
   status: "ok" | "degraded";
   model: string;
   dependencies: { name: string; status: string; error?: string }[];
+}
+
+export interface TrendMetrics {
+  sampleSize: number;
+  windowDays: number;
+  medianViews: number;
+  medianViewsPerDay: number;
+  medianEngagementRate: number;
+  distinctChannels: number;
+  topChannelShare: number;
+  medianSubscribers: number | null;
+  hiddenSubscriberChannels: number;
+}
+
+export interface TrendSnapshot {
+  id: number;
+  source: string;
+  query: string;
+  region: string;
+  language: string;
+  metrics: TrendMetrics;
+  collectedAt: string;
+}
+
+export interface TrendResult {
+  snapshot: TrendSnapshot;
+  scores: {
+    demand: number | null;
+    competition: number | null;
+    momentumPercent: number | null;
+    trend: number | null;
+  };
+  previous: TrendSnapshot | null;
+  cached: boolean;
+  notes: string[];
+}
+
+export interface Integrations {
+  youtubeDataApi: { configured: boolean; quota: { usedToday: number; limit: number } | null };
+  youtubeOAuth: { configured: boolean };
+}
+
+export interface MentionStats {
+  recent7d: number;
+  previous7d: number;
+  momentumPercent: number | null;
+  activeFeeds: number;
+}
+
+export interface Watch {
+  id: number;
+  query: string;
+  queryKey: string;
+  region: string;
+  language: string;
+  source: "channel" | "manual";
+  active: boolean;
+  nextDueAt: string;
+  lastMeasuredAt: string | null;
+  lastError: string;
+  createdAt: string;
+}
+
+export interface TrendPoint {
+  collectedAt: string;
+  medianViewsPerDay: number;
+  sampleSize: number;
+  scores: { demand: number | null; competition: number | null; momentumPercent: number | null; trend: number | null };
+}
+
+export type FeedStatus = "pending" | "ok" | "not_modified" | "error";
+
+export interface Feed {
+  id: number;
+  url: string;
+  title: string;
+  active: boolean;
+  nextFetchAt: string;
+  lastFetchedAt: string | null;
+  lastStatus: FeedStatus;
+  lastError: string;
+  itemCount: number;
+  createdAt: string;
+}
+
+export interface RefreshResult {
+  measured: number;
+  failed: number;
+  stopped?: string;
+  feedsFetched: number;
+  feedsFailed: number;
+  itemsPruned: number;
 }

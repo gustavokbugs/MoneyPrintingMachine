@@ -13,11 +13,16 @@ Every AI feature runs on a local model through [Ollama](https://github.com/ollam
 | Brand assets: avatar and banner (SVG, PNG export) | Implemented (deterministic, no GPU) |
 | Durable background jobs with retries | Implemented |
 | Dashboard with bulk pause/resume | Implemented |
-| Trend data sources (YouTube Data API, RSS, Reddit) | Not yet; measured scores show as "Not measured" |
-| Platform OAuth (YouTube, TikTok, Instagram) | Not yet; guided manual setup only |
+| Trend data: YouTube Data API (demand, competition, momentum snapshots) | Implemented (needs `YOUTUBE_API_KEY`) |
+| Name handle checks against YouTube | Implemented (needs `YOUTUBE_API_KEY`) |
+| YouTube account connection (OAuth 2.0 + PKCE, encrypted tokens, verification) | Implemented (needs a Google OAuth client) |
+| Scheduled trend refresh (watchlist re-measured daily) | Implemented |
+| News mentions from RSS feeds | Implemented (add feeds on the Trends page) |
+| Trend data: Reddit | Not yet |
+| TikTok and Instagram connections | Not yet; guided manual setup only |
 | Script, narration, visuals, rendering, publishing, analytics | Not yet |
 
-Channels cannot reach **Ready** until a platform connection is verified by the platform, so the wizard currently stops at **Awaiting Platform Setup**. This is intentional: nothing is reported as connected unless it really is.
+Channels reach **Ready** only after a platform connection is verified by the platform (today: a YouTube channel authorized with upload permission). Nothing is reported as connected unless it really is.
 
 ## Prerequisites
 
@@ -57,6 +62,27 @@ Channels cannot reach **Ready** until a platform connection is verified by the p
 
    Open http://127.0.0.1:5173.
 
+## YouTube setup (optional)
+
+Both parts are free and use a Google Cloud project you own.
+
+**Trend data and handle checks (API key)**
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and enable **YouTube Data API v3**.
+2. Create an **API key** (APIs & Services → Credentials). Restrict it to the YouTube Data API.
+3. Set `YOUTUBE_API_KEY` in `backend/.env`.
+
+Each niche measurement costs about 102 quota units (one search plus two lookups) and is cached for 6 hours; a discovery run measures up to 10 niches. Handle checks cost 1 unit per name. The app stops calling the API when `YOUTUBE_DAILY_QUOTA` is reached; usage resets at midnight Pacific time.
+
+**Channel connection (OAuth)**
+
+1. In the same project, configure the **OAuth consent screen** (External, Testing is fine) and add your Google account as a test user.
+2. Create an **OAuth client ID** of type **Web application** with the authorized redirect URI `http://127.0.0.1:8080/api/oauth/youtube/callback`.
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `TOKEN_ENCRYPTION_KEY` (generate it with `cd backend && go run ./cmd/keygen`).
+4. Restart the backend and use **Platform Setup → Connect YouTube account**.
+
+Scopes requested: `youtube.readonly`, `youtube.upload`, `yt-analytics.readonly`. While the app is in Testing mode, Google shows an "unverified app" warning and expires refresh tokens after 7 days; reconnect or submit the app for verification. Uploads from unaudited API projects may be restricted to private; see [docs/platform-capabilities.md](docs/platform-capabilities.md).
+
 ## Configuration
 
 | Variable | Purpose | Default |
@@ -69,6 +95,12 @@ Channels cannot reach **Ready** until a platform connection is verified by the p
 | `WORKER_CONCURRENCY` | Parallel background jobs | `1` |
 | `LOCAL_OWNER_ID` | Single local operator ID | `local` |
 | `WEB_DIST` | Serve built web app from the Go server | unset |
+| `WEB_BASE_URL` | Browser return address after OAuth | `http://127.0.0.1:5173` |
+| `YOUTUBE_API_KEY` | YouTube Data API key (trends, handle checks) | unset |
+| `YOUTUBE_DAILY_QUOTA` | Local daily quota budget in units | `10000` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client for connections | unset |
+| `GOOGLE_REDIRECT_URL` | OAuth redirect URI | `http://<HTTP_ADDR>/api/oauth/youtube/callback` |
+| `TOKEN_ENCRYPTION_KEY` | Base64 32-byte key for stored tokens | unset |
 | `TEST_DATABASE_URL` | Enables PostgreSQL integration tests | unset |
 
 The API has no login yet. Keep `HTTP_ADDR` on localhost.
@@ -84,9 +116,11 @@ Set `TEST_DATABASE_URL` to run the PostgreSQL integration tests; they create and
 
 ## Documentation
 
+- [Project status and open gaps](docs/STATUS.md): start here
 - [Architecture](docs/architecture.md)
 - [Channel lifecycle](docs/channel-lifecycle.md)
 - [Platform capabilities and limits](docs/platform-capabilities.md)
+- [UI design system](design-system/content-factory/MASTER.md): tokens, components, and accessibility rules for the web app, derived from the vendored [ui-ux-pro-max](.claude/skills/ui-ux-pro-max/SOURCE.md) skill. Read it before changing UI.
 
 ## Troubleshooting
 

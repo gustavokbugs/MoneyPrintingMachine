@@ -24,6 +24,9 @@ import (
 	"contentfactory/internal/launchpad"
 	"contentfactory/internal/llm"
 	"contentfactory/internal/postgres"
+	"contentfactory/internal/refresh"
+	"contentfactory/internal/rss"
+	"contentfactory/internal/trends"
 )
 
 func main() {
@@ -74,7 +77,18 @@ func run(log *slog.Logger) error {
 	jobStore := postgres.NewJobStore(pool)
 	engine := launchpad.NewEngine(model)
 
-	runner := jobs.NewRunner(jobStore, engine.Handlers(channels), jobs.RunnerConfig{
+	yt, err := buildYouTube(cfg, pool, channels, log)
+	if err != nil {
+		return err
+	}
+	feeds := rss.NewService(postgres.NewFeedRepository(pool), rss.NewFetcher(rss.NewClient(30*time.Second, false)))
+	watchlist := postgres.NewWatchlistRepository(pool)
+	engine.WithMeasurer(yt.trends).WithHandleLookup(yt.data).WithNews(feeds)
+
+	handlers := engine.Handlers(channels)
+	handlers[refresh.KindTrendRefresh] = refresh.Handler(trends.NewRefresher(watchlist, yt.trends), feeds, jobStore)
+
+	runner := jobs.NewRunner(jobStore, handlers, jobs.RunnerConfig{
 		Concurrency: cfg.WorkerConcurrency,
 		Lease:       cfg.LLMTimeout*3 + time.Minute, // Blueprints make several model calls.
 	}, log.With("component", "jobs"))
@@ -83,6 +97,10 @@ func run(log *slog.Logger) error {
 		defer close(runnerDone)
 		runner.Run(ctx)
 	}()
+
+	// Enqueue a trend refresh every 15 minutes; the job itself decides
+	// which watches and feeds are due.
+	go refresh.Schedule(ctx, jobs.NewEnqueuer(jobStore), cfg.LocalOwnerID, 15*time.Minute, log.With("component", "scheduler"))
 
 	api := httpapi.NewHandler(httpapi.Deps{
 		Channels:    channels,
@@ -93,9 +111,17 @@ func run(log *slog.Logger) error {
 			{Name: "database", Check: func(ctx context.Context) error { return pool.Ping(ctx) }},
 			{Name: "local_model", Check: model.Ping},
 		},
-		Model:   cfg.OllamaModel,
-		Log:     log.With("component", "http"),
-		OwnerID: cfg.LocalOwnerID,
+		YouTube:    yt.connections,
+		Trends:     yt.trends,
+		Names:      nameChecker{engine: engine, channels: channels},
+		Quota:      yt.budget,
+		Watchlist:  watchlist,
+		Feeds:      feeds,
+		Trajectory: yt.trends,
+		WebBaseURL: cfg.WebBaseURL,
+		Model:      cfg.OllamaModel,
+		Log:        log.With("component", "http"),
+		OwnerID:    cfg.LocalOwnerID,
 	})
 
 	srv := &http.Server{

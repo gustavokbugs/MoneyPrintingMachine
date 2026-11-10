@@ -150,3 +150,36 @@ func TestBulkChangeStatus(t *testing.T) {
 		t.Error("expected empty bulk request to be rejected")
 	}
 }
+
+func TestEditIdentityCarriesOnlyServerChecks(t *testing.T) {
+	repo := newMemRepo()
+	svc := NewService(repo, fixedConnections(0))
+	ctx := context.Background()
+	c, _ := svc.CreateDraft(ctx, "alice", "Space", "", "")
+	palette := Palette{"#111111", "#222222", "#333333", "#FFFFFF", "#000000"}
+	checked := Identity{ShortBio: "b", FullDescription: "d", Palette: palette, NameSuggestions: []NameSuggestion{
+		{Name: "Quiet Orbit", Availability: AvailabilityHandleTaken, Handle: "quietorbit"},
+	}}
+	if _, err := svc.SetIdentity(ctx, "alice", c.ID, checked); err != nil {
+		t.Fatal(err)
+	}
+	edit := checked
+	edit.NameSuggestions = []NameSuggestion{
+		{Name: "Quiet Orbit", Availability: AvailabilityNoChannel}, // client tries to flip the result
+		{Name: "Far Light", Availability: AvailabilityNoChannel},   // client invents a result
+	}
+	got, err := svc.EditIdentity(ctx, "alice", c.ID, edit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := got.Identity.NameSuggestions
+	if n[0].Availability != AvailabilityHandleTaken || n[0].Handle != "quietorbit" {
+		t.Fatalf("server check result not kept: %+v", n[0])
+	}
+	if n[1].Availability != AvailabilityNotChecked {
+		t.Fatalf("client-supplied result accepted: %+v", n[1])
+	}
+	if !got.Identity.Provenance.EditedByUser {
+		t.Fatal("edit not recorded in provenance")
+	}
+}

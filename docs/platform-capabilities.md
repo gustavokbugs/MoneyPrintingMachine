@@ -9,7 +9,7 @@ Last reviewed: 2026-11-10. Public sources disagree on several figures; items mar
 | Create account/channel via API | No | No | No |
 | Connect account (OAuth) | Yes | Yes (Login Kit) | Yes (Instagram Login) |
 | Detect and verify account via API | Yes | Yes | Yes |
-| Edit profile text via API | Yes (channel description, keywords) | No | No |
+| Edit profile text via API | Yes, with the broader `youtube` scope (not requested by this app yet) | No | No |
 | Upload avatar/banner via API | Banner: yes; avatar: no (verify) | No | No |
 | Publish via API | Yes | Yes (audit needed for public posts) | Yes (professional account + app review) |
 | Analytics via API | Yes (YouTube Analytics API) | Limited | Yes (Insights) |
@@ -19,6 +19,7 @@ Where a step has no API, the app shows a guided manual step and only moves forwa
 ## YouTube
 
 - Scopes: `youtube.upload`, `youtube.readonly`, `yt-analytics.readonly` (least privilege; add `youtube` only when profile editing is implemented).
+- Implemented in this app: OAuth connection with PKCE, channel detection via `channels.list?mine=true`, scope verification, token refresh and revocation, trend measurements (`search.list` 100 units + `videos.list` 1 + `channels.list` 1), and handle checks (`channels.list?forHandle=` 1 unit).
 - Data API default quota: 10,000 units/day per project.
 - `videos.insert` cost: historically about 1,600 units; recent sources report it was cut to about 100 units or moved to a separate bucket of about 100 calls/day (**verify** in the Google quota calculator).
 - Uploads from unaudited projects created after July 2020 have been locked to private; one recent report says this was relaxed (**verify**).

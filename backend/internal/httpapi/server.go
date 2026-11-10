@@ -29,9 +29,10 @@ type SavedNiches interface {
 	Delete(ctx context.Context, ownerID, id string) error
 }
 
-// Connections lists a channel's platform connections.
+// Connections reads platform connections.
 type Connections interface {
 	ListForChannel(ctx context.Context, ownerID, channelID string) ([]platforms.Connection, error)
+	VerifiedPlatforms(ctx context.Context, ownerID string, channelIDs []string) (map[string][]string, error)
 }
 
 // HealthCheck reports the status of one dependency.
@@ -47,8 +48,19 @@ type Deps struct {
 	SavedNiches SavedNiches
 	Connections Connections
 	Health      []HealthCheck
-	Model       string
-	Log         *slog.Logger
+	// Optional integrations; nil when not configured.
+	YouTube YouTubeConnections
+	Trends  TrendService
+	Names   NameChecker
+	Quota   QuotaUsage
+	// Trend refresh and news feeds; nil disables their endpoints.
+	Watchlist  WatchManager
+	Feeds      FeedManager
+	Trajectory TrajectorySource
+	// WebBaseURL is where the browser returns after OAuth.
+	WebBaseURL string
+	Model      string
+	Log        *slog.Logger
 	// OwnerID identifies the single local operator. Multi-user
 	// authentication is not implemented yet; every request acts as this
 	// owner, and all data access is still owner-scoped.
@@ -84,6 +96,27 @@ func NewHandler(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/launchpad/saved-niches", s.listSavedNiches)
 	mux.HandleFunc("POST /api/launchpad/saved-niches", s.createSavedNiche)
 	mux.HandleFunc("DELETE /api/launchpad/saved-niches/{id}", s.deleteSavedNiche)
+
+	mux.HandleFunc("POST /api/channels/{id}/identity/check-names", s.checkNames)
+	mux.HandleFunc("POST /api/channels/{id}/connections/youtube/start", s.startYouTube)
+	mux.HandleFunc("POST /api/channels/{id}/connections/youtube/verify", s.verifyYouTube)
+	mux.HandleFunc("DELETE /api/channels/{id}/connections/youtube", s.disconnectYouTube)
+	mux.HandleFunc("GET /api/oauth/youtube/callback", s.youtubeCallback)
+
+	mux.HandleFunc("POST /api/trends/measure", s.measureTrend)
+	mux.HandleFunc("GET /api/trends/history", s.trendHistory)
+	mux.HandleFunc("GET /api/integrations", s.integrations)
+	if d.Watchlist != nil && d.Feeds != nil && d.Trajectory != nil {
+		mux.HandleFunc("GET /api/trends/watchlist", s.listWatches)
+		mux.HandleFunc("POST /api/trends/watchlist", s.addWatch)
+		mux.HandleFunc("DELETE /api/trends/watchlist/{id}", s.deleteWatch)
+		mux.HandleFunc("GET /api/trends/trajectory", s.trajectory)
+		mux.HandleFunc("GET /api/trends/feeds", s.listFeeds)
+		mux.HandleFunc("POST /api/trends/feeds", s.addFeed)
+		mux.HandleFunc("DELETE /api/trends/feeds/{id}", s.deleteFeed)
+		mux.HandleFunc("GET /api/trends/mentions", s.mentions)
+		mux.HandleFunc("POST /api/trends/refresh", s.refreshNow)
+	}
 
 	mux.HandleFunc("GET /api/platforms", s.listPlatforms)
 	mux.HandleFunc("GET /api/jobs/{id}", s.getJob)

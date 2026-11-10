@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { Pencil } from "lucide-react";
+import { useId, useRef, useState } from "react";
 import { t } from "../i18n";
-import { errorMessage } from "./ui";
+import { useToast } from "./feedback";
+import { Button, errorMessage } from "./ui";
 
 interface Props {
   label: string;
@@ -10,20 +12,30 @@ interface Props {
   onSave: (next: string) => Promise<unknown>;
 }
 
-/** EditableText shows a value with an inline editor. */
+/** EditableText shows a value with an inline editor and save feedback. */
 export function EditableText({ label, value, multiline = false, maxLength = 5000, onSave }: Props) {
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const id = `edit-${label.replace(/\W+/g, "-").toLowerCase()}`;
+  const toast = useToast();
+  const id = useId();
+  const editButton = useRef<HTMLButtonElement>(null);
+
+  const close = () => {
+    setDraft(null);
+    setError(null);
+    // Return focus to the control that opened the editor.
+    requestAnimationFrame(() => editButton.current?.focus());
+  };
 
   if (draft === null) {
     return (
       <div className="field">
         <dt>{label}</dt>
         <dd className="editable">
-          <span className={multiline ? "prewrap" : ""}>{value || "—"}</span>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDraft(value)} aria-label={`${t("common.edit")} ${label}`}>
+          <span className={multiline ? "prewrap" : ""}>{value || <span className="muted">—</span>}</span>
+          <button ref={editButton} type="button" className="btn btn-ghost btn-sm" onClick={() => setDraft(value)} aria-label={t("common.editField", { field: label })}>
+            <Pencil size={14} aria-hidden="true" />
             {t("common.edit")}
           </button>
         </dd>
@@ -36,7 +48,8 @@ export function EditableText({ label, value, multiline = false, maxLength = 5000
     setError(null);
     try {
       await onSave(draft);
-      setDraft(null);
+      toast.success(t("common.savedField", { field: label }));
+      close();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -44,29 +57,55 @@ export function EditableText({ label, value, multiline = false, maxLength = 5000
     }
   };
 
+  const errorId = `${id}-error`;
   return (
     <div className="field">
       <dt>
         <label htmlFor={id}>{label}</label>
       </dt>
-      <dd>
+      <dd className="stack-sm">
         {multiline ? (
-          <textarea id={id} rows={5} value={draft} maxLength={maxLength} onChange={(e) => setDraft(e.target.value)} />
+          <textarea
+            id={id}
+            rows={5}
+            value={draft}
+            maxLength={maxLength}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && close()}
+            autoFocus
+          />
         ) : (
-          <input id={id} value={draft} maxLength={maxLength} onChange={(e) => setDraft(e.target.value)} />
+          <input
+            id={id}
+            value={draft}
+            maxLength={maxLength}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") close();
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void save();
+              }
+            }}
+            autoFocus
+          />
         )}
         {error && (
-          <p className="error-text" role="alert">
+          <span id={errorId} className="error-text" role="alert">
             {error}
-          </p>
+          </span>
         )}
         <div className="row">
-          <button type="button" className="btn btn-primary btn-sm" disabled={saving} onClick={() => void save()}>
-            {saving ? t("common.saving") : t("common.save")}
-          </button>
-          <button type="button" className="btn btn-ghost btn-sm" disabled={saving} onClick={() => setDraft(null)}>
+          <Button size="sm" variant="primary" loading={saving} onClick={() => void save()}>
+            {t("common.save")}
+          </Button>
+          <Button size="sm" variant="ghost" disabled={saving} onClick={close}>
             {t("common.cancel")}
-          </button>
+          </Button>
         </div>
       </dd>
     </div>

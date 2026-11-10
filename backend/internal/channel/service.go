@@ -192,3 +192,39 @@ func (s *Service) SetBlueprint(ctx context.Context, ownerID, id string, bp Bluep
 		return nil, nil
 	})
 }
+
+// EditIdentity stores a user-edited identity. Name check results cannot be
+// set by the client: results are kept only for names that were already
+// checked server-side, and every other name is marked not checked.
+func (s *Service) EditIdentity(ctx context.Context, ownerID, id string, idn Identity) (*Channel, error) {
+	idn.Provenance.EditedByUser = true
+	return s.Mutate(ctx, ownerID, id, func(c *Channel) (*StatusEvent, error) {
+		if c.Status == StatusArchived {
+			return nil, &ValidationError{Field: "status", Message: "archived channels cannot be edited"}
+		}
+		next := idn
+		next.NameSuggestions = carryNameChecks(c.Identity, idn.NameSuggestions)
+		if err := next.Validate(); err != nil {
+			return nil, err
+		}
+		c.Identity = &next
+		return nil, nil
+	})
+}
+
+func carryNameChecks(prev *Identity, names []NameSuggestion) []NameSuggestion {
+	checked := map[string]NameSuggestion{}
+	if prev != nil {
+		for _, n := range prev.NameSuggestions {
+			checked[n.Name] = n
+		}
+	}
+	out := make([]NameSuggestion, len(names))
+	for i, n := range names {
+		out[i] = NameSuggestion{Name: n.Name, Rationale: n.Rationale, Availability: AvailabilityNotChecked}
+		if p, ok := checked[n.Name]; ok {
+			out[i].Availability, out[i].Handle, out[i].CheckedAt = p.Availability, p.Handle, p.CheckedAt
+		}
+	}
+	return out
+}
