@@ -195,12 +195,7 @@ func (s *server) putIdentity(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &idn) {
 		return
 	}
-	idn.Provenance.EditedByUser = true
-	// Availability can only be set by a real checker, never by a client.
-	for i := range idn.NameSuggestions {
-		idn.NameSuggestions[i].Availability = "not_checked"
-	}
-	c, err := s.Channels.SetIdentity(r.Context(), s.OwnerID, r.PathValue("id"), idn)
+	c, err := s.Channels.EditIdentity(r.Context(), s.OwnerID, r.PathValue("id"), idn)
 	if err != nil {
 		s.writeDomainError(w, r, err)
 		return
