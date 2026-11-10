@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Factory, LayoutDashboard, Monitor, Moon, Rocket, Sun } from "lucide-react";
+import { Factory, LayoutDashboard, Monitor, Moon, Rocket, Sun, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { api } from "./api/client";
@@ -8,6 +8,7 @@ import { t, type MessageKey } from "./i18n";
 import { ChannelWizard } from "./pages/ChannelWizard";
 import { Dashboard } from "./pages/Dashboard";
 import { Launchpad } from "./pages/Launchpad";
+import { Trends } from "./pages/Trends";
 
 type ThemeChoice = "system" | "light" | "dark";
 const THEME_KEY = "theme";
@@ -87,6 +88,7 @@ function useFocusOnRouteChange() {
 const navItems = [
   { to: "/", label: "nav.dashboard" as const, icon: LayoutDashboard, end: true },
   { to: "/launchpad", label: "nav.launchpad" as const, icon: Rocket, end: false },
+  { to: "/trends", label: "nav.trends" as const, icon: TrendingUp, end: false },
 ];
 
 export function App() {
@@ -121,6 +123,7 @@ export function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/launchpad" element={<Launchpad />} />
+            <Route path="/trends" element={<Trends />} />
             <Route path="/channels/:id" element={<ChannelWizard />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

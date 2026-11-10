@@ -26,15 +26,16 @@ Last updated: 2026-11-10
 | Web UI redesign (design system, themes, accessibility) | Done | `design-system/content-factory/MASTER.md` |
 | YouTube trend measurement and handle checks | Blocked | Code done; needs an API key (gap G2) |
 | YouTube channel connection (OAuth) | Blocked | Code done; needs an OAuth client (gap G3) |
-| Local AI generation (niches, strategy, identity, blueprint) | Blocked | Code done; needs Ollama and a model (gap G1) |
+| Local AI generation (niches, strategy, identity, blueprint) | Done | Ollama 0.40.16 with `qwen3:4b` installed on the dev machine |
+| Scheduled trend refresh (watchlist) | Done | Runs every 15 minutes as a durable job; YouTube measurements need G2 |
+| RSS news feeds as a trend source | Done | Add feeds on the Trends page; SSRF-protected fetcher |
 
 ## 2. Open gaps
 
-### G1. Local language model — Done when the model is pulled
+### G1. Local language model — Done
 
-- **What:** Ollama runtime and the `qwen3:4b` model (about 2.6 GB).
-- **Status:** Installer downloaded from ollama.com, signature verified (Ollama Inc.), installed silently on 2026-11-10. The model pull and a generation smoke test follow.
-- **Owner action:** none, unless the install failed (see the latest entry in section 4).
+- Ollama 0.40.16 installed from the signed installer (publisher verified: Ollama Inc.) into `%LOCALAPPDATA%ProgramsOllama`, and `qwen3:4b` pulled. The health check reports `local_model: ok`.
+- Ollama starts with Windows through its tray app. If generation stops working after a reboot, open **Ollama** from the Start menu.
 
 ### G2. YouTube Data API key — Owner
 
@@ -77,9 +78,13 @@ Last updated: 2026-11-10
 
 - The repository is public. Commit metadata shows the author email configured in git. To hide it in future commits, enable "Keep my email address private" on GitHub and use the provided `noreply` address in `git config user.email`. Existing commits keep their email unless history is rewritten, which is not done without explicit approval.
 
+### G8. Job history retention — Done
+
+- Each refresh run deletes finished jobs older than 30 days; queued and running jobs are never removed.
+
 ## 3. Planned milestones
 
-1. **Trend refresh and RSS** (in progress): scheduled re-measurement so momentum builds automatically, and RSS feed collection as a second trend source.
+1. **Trend refresh and RSS** — done on branch `feat/trend-refresh-rss`.
 2. **Production pipeline:** research with sources, scripts with citations and fact-check gates, local narration (Kokoro TTS), visuals, FFmpeg rendering. Needs FFmpeg installed (planned agent task).
 3. **Publishing:** YouTube upload with idempotency and validation; depends on G3/G4.
 4. **Analytics:** YouTube Analytics ingestion and the performance dashboard; depends on G3/G4.
@@ -88,4 +93,5 @@ Last updated: 2026-11-10
 
 | Date | Change |
 | --- | --- |
+| 2026-11-10 | Trend refresh and RSS milestone built; Ollama and qwen3:4b installed (G1 closed). |
 | 2026-11-10 | Document created. Repository published at <https://github.com/gustavokbugs/MoneyPrintingMachine>. Ollama installer verified and run. |

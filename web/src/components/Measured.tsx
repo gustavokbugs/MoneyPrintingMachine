@@ -44,6 +44,15 @@ export function MeasuredBlock({ niche }: { niche: Niche }) {
         <ChartNoAxesColumn size={14} aria-hidden="true" />
         {t("launchpad.measuredTitle")}
       </span>
+      {m.news && (
+        <dl className="metric-grid">
+          <div>
+            <dt>{t("launchpad.news")}</dt>
+            <dd>{t("launchpad.newsValue", { recent: m.news.recent7d, previous: m.news.previous7d })}</dd>
+          </div>
+          <Score label={t("launchpad.newsMomentum")} value={m.news.momentumPercent} suffix="%" />
+        </dl>
+      )}
       {!m.metrics || !m.collectedAt ? (
         <p className="small muted">{t("launchpad.notMeasuredHint")}</p>
       ) : (

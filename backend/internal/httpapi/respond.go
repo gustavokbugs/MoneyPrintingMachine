@@ -11,6 +11,7 @@ import (
 	"contentfactory/internal/connections"
 	"contentfactory/internal/jobs"
 	"contentfactory/internal/launchpad"
+	"contentfactory/internal/rss"
 	"contentfactory/internal/trends"
 	"contentfactory/internal/youtube"
 )
@@ -103,6 +104,14 @@ func (s *server) writeDomainError(w http.ResponseWriter, r *http.Request, err er
 		writeError(w, http.StatusBadGateway, "upstream_unavailable", "YouTube could not be reached. Try again shortly.")
 	case errors.Is(err, trends.ErrInvalidQuery):
 		writeFieldError(w, http.StatusUnprocessableEntity, "validation_failed", err.Error(), "query")
+	case errors.Is(err, trends.ErrWatchNotFound):
+		writeError(w, http.StatusNotFound, "watch_not_found", "Watched query not found. Channel niches are managed by their channels.")
+	case errors.Is(err, rss.ErrFeedNotFound):
+		writeError(w, http.StatusNotFound, "feed_not_found", "Feed not found.")
+	case errors.Is(err, rss.ErrFeedExists), errors.Is(err, rss.ErrTooManyFeeds):
+		writeError(w, http.StatusConflict, "feed_conflict", err.Error())
+	case errors.Is(err, rss.ErrInvalidURL):
+		writeFieldError(w, http.StatusUnprocessableEntity, "validation_failed", err.Error(), "url")
 	case errors.Is(err, launchpad.ErrPrecondition):
 		writeError(w, http.StatusConflict, "precondition_failed", err.Error())
 	default:

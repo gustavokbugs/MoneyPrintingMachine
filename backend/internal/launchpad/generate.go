@@ -29,6 +29,7 @@ type Engine struct {
 	now      func() time.Time
 	measurer Measurer
 	handles  HandleLookup
+	news     NewsCounter
 }
 
 // NewEngine builds an Engine.

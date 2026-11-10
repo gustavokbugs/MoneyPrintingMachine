@@ -53,6 +53,10 @@ type Deps struct {
 	Trends  TrendService
 	Names   NameChecker
 	Quota   QuotaUsage
+	// Trend refresh and news feeds; nil disables their endpoints.
+	Watchlist  WatchManager
+	Feeds      FeedManager
+	Trajectory TrajectorySource
 	// WebBaseURL is where the browser returns after OAuth.
 	WebBaseURL string
 	Model      string
@@ -102,6 +106,17 @@ func NewHandler(d Deps) http.Handler {
 	mux.HandleFunc("POST /api/trends/measure", s.measureTrend)
 	mux.HandleFunc("GET /api/trends/history", s.trendHistory)
 	mux.HandleFunc("GET /api/integrations", s.integrations)
+	if d.Watchlist != nil && d.Feeds != nil && d.Trajectory != nil {
+		mux.HandleFunc("GET /api/trends/watchlist", s.listWatches)
+		mux.HandleFunc("POST /api/trends/watchlist", s.addWatch)
+		mux.HandleFunc("DELETE /api/trends/watchlist/{id}", s.deleteWatch)
+		mux.HandleFunc("GET /api/trends/trajectory", s.trajectory)
+		mux.HandleFunc("GET /api/trends/feeds", s.listFeeds)
+		mux.HandleFunc("POST /api/trends/feeds", s.addFeed)
+		mux.HandleFunc("DELETE /api/trends/feeds/{id}", s.deleteFeed)
+		mux.HandleFunc("GET /api/trends/mentions", s.mentions)
+		mux.HandleFunc("POST /api/trends/refresh", s.refreshNow)
+	}
 
 	mux.HandleFunc("GET /api/platforms", s.listPlatforms)
 	mux.HandleFunc("GET /api/jobs/{id}", s.getJob)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"contentfactory/internal/channel"
+	"contentfactory/internal/rss"
 	"contentfactory/internal/trends"
 	"contentfactory/internal/youtube"
 )
@@ -174,5 +175,63 @@ func TestCheckNames(t *testing.T) {
 
 	if _, err := fixedEngine(&scriptedGen{}).CheckNames(context.Background(), store, "alice", "ch1"); !errors.Is(err, ErrPrecondition) {
 		t.Fatalf("expected precondition error without lookup, got %v", err)
+	}
+}
+
+type fakeNews struct{ feeds int }
+
+func (f fakeNews) Mentions(_ context.Context, _, query string) (rss.MentionStats, error) {
+	if query == "Beta" {
+		return rss.MentionStats{}, errors.New("db down")
+	}
+	pct := 50.0
+	return rss.MentionStats{Recent7d: 3, Previous7d: 2, MomentumPercent: &pct, ActiveFeeds: f.feeds}, nil
+}
+
+func TestDiscoverWithNewsAndMeasurements(t *testing.T) {
+	e := fixedEngine(&scriptedGen{responses: []string{threeNiches(t)}}).
+		WithMeasurer(&fakeMeasurer{available: true}).
+		WithNews(fakeNews{feeds: 2})
+	report, err := e.DiscoverNiches(context.Background(), DiscoverInput{OwnerID: "alice"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range report.Niches {
+		if n.Name == "Beta" {
+			if n.Measured.News != nil {
+				t.Fatal("failed news count must stay empty")
+			}
+			continue
+		}
+		if n.Measured.News == nil || n.Measured.News.Recent7d != 3 || n.Measured.DemandScore == nil {
+			t.Fatalf("%s: expected both YouTube and news data, got %+v", n.Name, n.Measured)
+		}
+		if strings.Join(n.Measured.Sources, ",") != "youtube_data_api,rss" {
+			t.Fatalf("%s: sources = %v", n.Name, n.Measured.Sources)
+		}
+	}
+	var news DataSourceStatus
+	for _, ds := range report.DataSources {
+		if ds.Name == newsSourceName {
+			news = ds
+		}
+	}
+	if news.Status != "connected" || !strings.Contains(news.Note, "2 feed(s)") || !strings.Contains(news.Note, "1 count(s) failed") {
+		t.Fatalf("news source: %+v", news)
+	}
+}
+
+func TestDiscoverNewsWithoutFeeds(t *testing.T) {
+	e := fixedEngine(&scriptedGen{responses: []string{threeNiches(t)}}).WithNews(fakeNews{feeds: 0})
+	report, _ := e.DiscoverNiches(context.Background(), DiscoverInput{})
+	for _, ds := range report.DataSources {
+		if ds.Name == newsSourceName && ds.Status != "not_configured" {
+			t.Fatalf("expected not_configured, got %+v", ds)
+		}
+	}
+	for _, n := range report.Niches {
+		if n.Measured.News != nil {
+			t.Fatal("no feeds means no news data")
+		}
 	}
 }

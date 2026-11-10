@@ -28,6 +28,7 @@ function niche(name: string, heuristicScore: number, demand: number | null, comp
       searchInterest: null,
       metrics: null,
       collectedAt: null,
+      news: null,
       sources: [],
     },
   };
