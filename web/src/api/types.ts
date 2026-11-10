@@ -47,10 +47,14 @@ export interface Strategy {
   provenance: Provenance;
 }
 
+export type NameAvailability = "not_checked" | "handle_taken" | "no_channel_with_handle" | "invalid_handle";
+
 export interface NameSuggestion {
   name: string;
   rationale: string;
-  availability: string;
+  availability: NameAvailability | "";
+  handle?: string;
+  checkedAt?: string;
 }
 
 export interface Palette {
@@ -112,6 +116,8 @@ export interface Channel {
   strategy: Strategy | null;
   identity: Identity | null;
   blueprint: Blueprint | null;
+  /** Present only in list responses; omitted means no verified platform. */
+  connectedPlatforms?: string[];
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -152,8 +158,12 @@ export interface Niche {
   heuristicScore: number;
   measured: {
     trendScore: number | null;
+    momentumPercent: number | null;
+    demandScore: number | null;
     competitionScore: number | null;
     searchInterest: number | null;
+    metrics: TrendMetrics | null;
+    collectedAt: string | null;
     sources: string[];
   };
 }
@@ -222,4 +232,44 @@ export interface Health {
   status: "ok" | "degraded";
   model: string;
   dependencies: { name: string; status: string; error?: string }[];
+}
+
+export interface TrendMetrics {
+  sampleSize: number;
+  windowDays: number;
+  medianViews: number;
+  medianViewsPerDay: number;
+  medianEngagementRate: number;
+  distinctChannels: number;
+  topChannelShare: number;
+  medianSubscribers: number | null;
+  hiddenSubscriberChannels: number;
+}
+
+export interface TrendSnapshot {
+  id: number;
+  source: string;
+  query: string;
+  region: string;
+  language: string;
+  metrics: TrendMetrics;
+  collectedAt: string;
+}
+
+export interface TrendResult {
+  snapshot: TrendSnapshot;
+  scores: {
+    demand: number | null;
+    competition: number | null;
+    momentumPercent: number | null;
+    trend: number | null;
+  };
+  previous: TrendSnapshot | null;
+  cached: boolean;
+  notes: string[];
+}
+
+export interface Integrations {
+  youtubeDataApi: { configured: boolean; quota: { usedToday: number; limit: number } | null };
+  youtubeOAuth: { configured: boolean };
 }

@@ -11,12 +11,15 @@ import type {
   ChannelStatus,
   Health,
   Identity,
+  Integrations,
   Job,
   LaunchReview,
   PlatformCapability,
   PlatformConnection,
   SavedNiche,
   Strategy,
+  TrendResult,
+  TrendSnapshot,
 } from "./types";
 
 /** ApiError carries the server's stable error code and message. */
@@ -123,6 +126,41 @@ export const api = {
     ),
   deleteSavedNiche: async (id: string) => {
     await request("DELETE", `/api/launchpad/saved-niches/${encodeURIComponent(id)}`);
+  },
+
+  integrations: async () =>
+    asRecordOf<Integrations>("integrations", ["youtubeDataApi", "youtubeOAuth"])(await request("GET", "/api/integrations")),
+  measureTrend: async (query: string, region: string, language: string) =>
+    asRecordOf<TrendResult>("trend result", ["snapshot", "scores"])(
+      await request("POST", "/api/trends/measure", { query, region, language }),
+    ),
+  trendHistory: async (query: string, region: string, language: string) =>
+    asItems(
+      await request("GET", `/api/trends/history?${new URLSearchParams({ query, region, language }).toString()}`),
+      asRecordOf<TrendSnapshot>("trend snapshot", ["metrics", "collectedAt"]),
+    ),
+  checkNames: async (id: string) => {
+    const data = await request("POST", `/api/channels/${encodeURIComponent(id)}/identity/check-names`);
+    if (!isRecord(data)) throw new ApiError(0, "invalid_response", "The server returned an invalid response.");
+    return {
+      channel: asChannel(data.channel),
+      complete: data.complete === true,
+      warning: typeof data.warning === "string" ? data.warning : null,
+    };
+  },
+  startYouTube: async (id: string) => {
+    const data = await request("POST", `/api/channels/${encodeURIComponent(id)}/connections/youtube/start`);
+    if (!isRecord(data) || typeof data.authorizationUrl !== "string" || !data.authorizationUrl.startsWith("https://accounts.google.com/")) {
+      throw new ApiError(0, "invalid_response", "The server returned an unexpected authorization URL.");
+    }
+    return data.authorizationUrl;
+  },
+  verifyYouTube: async (id: string) =>
+    asRecordOf<PlatformConnection>("connection", ["platform", "status"])(
+      await request("POST", `/api/channels/${encodeURIComponent(id)}/connections/youtube/verify`),
+    ),
+  disconnectYouTube: async (id: string) => {
+    await request("DELETE", `/api/channels/${encodeURIComponent(id)}/connections/youtube`);
   },
 
   platforms: async () =>
