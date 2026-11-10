@@ -11,6 +11,10 @@ web (React, Vite) ──HTTP──▶ backend/cmd/server
                               ├─ internal/launchpad  application: niche/strategy/identity/blueprint generation
                               ├─ internal/branding   deterministic SVG avatar and banner rendering
                               ├─ internal/platforms  platform capability catalog, connection read model
+                              ├─ internal/trends     measured demand/competition/momentum from YouTube snapshots
+                              ├─ internal/connections YouTube OAuth connect, callback, verify, disconnect
+                              ├─ internal/youtube    adapter: YouTube Data API, Google OAuth, daily quota budget
+                              ├─ internal/secrets    AES-256-GCM encryption for stored tokens
                               ├─ internal/jobs       durable jobs: leases, retries, bounded concurrency
                               ├─ internal/llm        adapter: local Ollama client
                               └─ internal/postgres   adapter: repositories, job store, migrations
@@ -27,6 +31,9 @@ Dependencies point inward: `channel` knows nothing about HTTP, SQL, or models; a
 - **Openly licensed fonts.** Typography recommendations are restricted to an allowlist of SIL Open Font License families (`internal/launchpad/identity.go`).
 - **Durable jobs.** Slow work runs as jobs in PostgreSQL, claimed with `FOR UPDATE SKIP LOCKED` and a lease, so a crashed worker's job is picked up again. Errors are retryable by default with exponential backoff and jitter; validation errors, unmet preconditions, and missing records fail permanently. Enqueue requests accept an `Idempotency-Key`.
 - **Optimistic concurrency.** Channels carry a `version`; saves fail with a conflict when another write happened first, and use cases retry a bounded number of times.
+- **Measured trend scores.** Demand = 100 · log10(1 + median views/day) / log10(1 + 50,000) over the 50 most viewed videos of the last 30 days; competition uses the same log scale on median channel subscribers (reference 10,000,000); momentum compares median views/day with a snapshot at least 12 hours older. Snapshots are cached for 6 hours to save quota. Google Trends has no generally available API, so search interest is never shown.
+- **Quota discipline.** Every Data API call reserves its documented cost in `api_quota_usage` before it is sent, against a local daily budget (Pacific-time days).
+- **OAuth safety.** Authorization uses PKCE and a single-use state stored only as a SHA-256 hash with a 10-minute expiry. Tokens are encrypted with AES-256-GCM bound to channel and token kind, never logged, and never sent to the browser. A connection is "verified" only when Google returns the authorized channel and the upload scope was granted. One YouTube channel can be linked to only one internal channel.
 - **Single local operator.** There is no authentication yet. Every request acts as `LOCAL_OWNER_ID`, and all data access is still owner-scoped so multi-user support can be added at the edge.
 
 ## Dependencies and licenses
@@ -41,8 +48,9 @@ Dependencies point inward: `channel` knows nothing about HTTP, SQL, or models; a
 
 ## Roadmap
 
-1. Trend intelligence: YouTube Data API (API key) and RSS collectors with stored snapshots; feed measured niche scores.
-2. YouTube OAuth: connect accounts, detect channels, verify scopes, store encrypted tokens.
-3. Production pipeline: research with sources, scripts with citations and fact-check gates, local narration (Kokoro TTS, Apache 2.0, CPU-friendly), visuals (motion graphics, optional Stable Diffusion), FFmpeg rendering.
-4. Publishing with idempotency and platform-specific validation; TikTok and Instagram connections.
-5. Analytics ingestion and the performance dashboard.
+1. Done: YouTube Data API trend snapshots (demand, competition, momentum) and handle checks.
+2. Done: YouTube OAuth connection with PKCE, encrypted tokens, and platform verification.
+3. More trend sources: RSS feeds and a scheduled re-measurement job so momentum builds up without manual runs.
+4. Production pipeline: research with sources, scripts with citations and fact-check gates, local narration (Kokoro TTS, Apache 2.0, CPU-friendly), visuals (motion graphics, optional Stable Diffusion), FFmpeg rendering.
+5. Publishing with idempotency and platform-specific validation; TikTok and Instagram connections.
+6. Analytics ingestion and the performance dashboard.
