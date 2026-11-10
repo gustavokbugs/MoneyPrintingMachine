@@ -1,0 +1,91 @@
+# Project Status and Open Gaps
+
+Master document for what works, what is blocked, and what needs the owner.
+Update it whenever a gap is closed or a new one appears.
+
+Last updated: 2026-11-10
+
+## Legend
+
+| Mark | Meaning |
+| --- | --- |
+| Done | Implemented and tested |
+| Blocked | Implemented, waiting on something outside the code |
+| Owner | Requires the project owner (account, credentials, legal acceptance, or a decision) |
+| Planned | Not built yet |
+
+## 1. What works today
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Channel workspaces, lifecycle, status history, bulk pause/resume | Done | `internal/channel` |
+| Durable background jobs (retries, leases, idempotency) | Done | `internal/jobs`, PostgreSQL-backed |
+| PostgreSQL schema and migrations | Done | Applied automatically on server start |
+| Channel Launchpad wizard (niche → strategy → branding → platforms → blueprint → review) | Done | Generation steps need the local model (section 2) |
+| Avatar and banner generation (SVG, PNG export) | Done | Deterministic, no GPU |
+| Web UI redesign (design system, themes, accessibility) | Done | `design-system/content-factory/MASTER.md` |
+| YouTube trend measurement and handle checks | Blocked | Code done; needs an API key (gap G2) |
+| YouTube channel connection (OAuth) | Blocked | Code done; needs an OAuth client (gap G3) |
+| Local AI generation (niches, strategy, identity, blueprint) | Blocked | Code done; needs Ollama and a model (gap G1) |
+
+## 2. Open gaps
+
+### G1. Local language model — Done when the model is pulled
+
+- **What:** Ollama runtime and the `qwen3:4b` model (about 2.6 GB).
+- **Status:** Installer downloaded from ollama.com, signature verified (Ollama Inc.), installed silently on 2026-11-10. The model pull and a generation smoke test follow.
+- **Owner action:** none, unless the install failed (see the latest entry in section 4).
+
+### G2. YouTube Data API key — Owner
+
+- **Why the owner:** creating it requires signing in to the owner's Google account and accepting Google Cloud's terms. Agents must not sign in, accept terms, or handle the key in web forms.
+- **Steps:**
+  1. Open <https://console.cloud.google.com/>, create a project (for example "content-factory").
+  2. APIs & Services → Library → enable **YouTube Data API v3**.
+  3. APIs & Services → Credentials → **Create credentials → API key**. Restrict it to YouTube Data API v3.
+  4. Put it in `backend/.env` as `YOUTUBE_API_KEY=...` (the file is gitignored).
+  5. Restart the backend.
+- **Unlocks:** measured demand/competition/trend scores in niche discovery, and name handle checks.
+- **Cost:** free within the default quota of 10,000 units/day. The app caps itself with `YOUTUBE_DAILY_QUOTA`.
+
+### G3. Google OAuth client for channel connections — Owner
+
+- **Why the owner:** the same account sign-in and terms acceptance as G2. The consent screen publishes an app name under the owner's identity.
+- **Steps:**
+  1. APIs & Services → **OAuth consent screen**: User type *External*, publishing status *Testing*; add your own Google account under **Test users**.
+  2. Credentials → **Create credentials → OAuth client ID**, type **Web application**.
+  3. Authorized redirect URI: `http://127.0.0.1:8081/api/oauth/youtube/callback` (port 8081 because port 8080 is used by another service on this machine).
+  4. Put `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `backend/.env`. `TOKEN_ENCRYPTION_KEY` is already set locally.
+  5. Restart the backend.
+- **Known limits while in Testing mode:** Google shows an "unverified app" warning, and refresh tokens expire after 7 days (reconnect, or submit the app for verification). Uploads from unaudited API projects may be restricted to private; see `docs/platform-capabilities.md`.
+
+### G4. Create the YouTube channel and approve access — Owner
+
+- **Why the owner:** YouTube has no API for creating channels, and granting the app access to an account is the account holder's decision.
+- **Steps:** create the channel at <https://www.youtube.com/create_channel> using the generated name, then use **Platform Setup → Connect YouTube account** and click **Allow** on Google's consent screen.
+- **Unlocks:** the channel can move to **Ready**, then **Active**.
+
+### G5. TikTok and Instagram integrations — Planned (needs owner later)
+
+- Need developer apps on TikTok for Developers and Meta for Developers, plus TikTok's Content Posting API audit and Meta app review before public posting. Owner action is needed to register the apps and submit the reviews.
+
+### G6. Merge the open pull request — Owner decision
+
+- <https://github.com/gustavokbugs/MoneyPrintingMachine/pull/1> holds the YouTube integration and the UI redesign. `master` contains only the initial milestone until it is merged.
+
+### G7. Public repository considerations — Owner decision
+
+- The repository is public. Commit metadata shows the author email configured in git. To hide it in future commits, enable "Keep my email address private" on GitHub and use the provided `noreply` address in `git config user.email`. Existing commits keep their email unless history is rewritten, which is not done without explicit approval.
+
+## 3. Planned milestones
+
+1. **Trend refresh and RSS** (in progress): scheduled re-measurement so momentum builds automatically, and RSS feed collection as a second trend source.
+2. **Production pipeline:** research with sources, scripts with citations and fact-check gates, local narration (Kokoro TTS), visuals, FFmpeg rendering. Needs FFmpeg installed (planned agent task).
+3. **Publishing:** YouTube upload with idempotency and validation; depends on G3/G4.
+4. **Analytics:** YouTube Analytics ingestion and the performance dashboard; depends on G3/G4.
+
+## 4. Change log
+
+| Date | Change |
+| --- | --- |
+| 2026-11-10 | Document created. Repository published at <https://github.com/gustavokbugs/MoneyPrintingMachine>. Ollama installer verified and run. |

@@ -114,6 +114,7 @@ Set `TEST_DATABASE_URL` to run the PostgreSQL integration tests; they create and
 
 ## Documentation
 
+- [Project status and open gaps](docs/STATUS.md): start here
 - [Architecture](docs/architecture.md)
 - [Channel lifecycle](docs/channel-lifecycle.md)
 - [Platform capabilities and limits](docs/platform-capabilities.md)
