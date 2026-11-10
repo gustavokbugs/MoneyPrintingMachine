@@ -1,16 +1,31 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../api/client";
-import type { Identity, Palette } from "../../api/types";
+import type { Identity, NameAvailability, Palette } from "../../api/types";
 import { downloadSvgAsPng, downloadUrl, slug } from "../../components/download";
 import { EditableText } from "../../components/EditableText";
 import { Empty, ErrorState, Field, JobProgress, ProvenanceNote, Section, TagList, errorMessage } from "../../components/ui";
 import { useGeneration } from "../../hooks/useGeneration";
-import { t } from "../../i18n";
+import { t, type MessageKey } from "../../i18n";
 import type { StepProps } from "../ChannelWizard";
 import { useChannelUpdate } from "./shared";
 
 const VARIANTS = 4;
 const paletteKeys: (keyof Palette)[] = ["primary", "secondary", "accent", "background", "text"];
+
+const availabilityClass: Record<NameAvailability, string> = {
+  not_checked: "chip",
+  handle_taken: "chip chip-low",
+  no_channel_with_handle: "chip chip-high",
+  invalid_handle: "chip chip-medium",
+};
+
+function AvailabilityChip({ availability, handle }: { availability: NameAvailability | ""; handle?: string }) {
+  const a: NameAvailability = availability === "" ? "not_checked" : availability;
+  return (
+    <span className={availabilityClass[a]}>{t(`branding.availability.${a}` as MessageKey, { handle: handle ?? "" })}</span>
+  );
+}
 
 export function BrandingStep({ channel, goTo }: StepProps) {
   const gen = useGeneration(channel.id, "identity");
@@ -23,6 +38,19 @@ export function BrandingStep({ channel, goTo }: StepProps) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const idn = channel.identity;
   const locked = channel.status === "archived";
+
+  const qc = useQueryClient();
+  const integrations = useQuery({ queryKey: ["integrations"], queryFn: api.integrations });
+  const handleChecks = integrations.data?.youtubeDataApi.configured === true;
+  const [checkWarning, setCheckWarning] = useState<string | null>(null);
+  const checkNames = useMutation({
+    mutationFn: () => api.checkNames(channel.id),
+    onSuccess: (res) => {
+      qc.setQueryData(["channel", channel.id], res.channel);
+      void qc.invalidateQueries({ queryKey: ["integrations"] });
+      setCheckWarning(res.complete ? null : res.warning);
+    },
+  });
 
   const edit = (patch: Partial<Identity>) => (idn ? saveIdentity.mutateAsync({ ...idn, ...patch }) : Promise.resolve());
   const fileStem = slug(channel.name || channel.niche);
@@ -58,14 +86,35 @@ export function BrandingStep({ channel, goTo }: StepProps) {
 
       {idn && (
         <>
-          <Section title={t("branding.names")}>
+          <Section
+            title={t("branding.names")}
+            actions={
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={!handleChecks || checkNames.isPending || locked}
+                title={handleChecks ? undefined : t("branding.checkUnavailable")}
+                onClick={() => checkNames.mutate()}
+              >
+                {checkNames.isPending ? t("branding.checking") : t("branding.checkNames")}
+              </button>
+            }
+          >
             <p className="small muted">{t("branding.namesHint")}</p>
+            {!handleChecks && integrations.isSuccess && <p className="small muted">{t("branding.checkUnavailable")}</p>}
+            {checkNames.isError && <ErrorState error={checkNames.error} />}
+            {checkWarning && (
+              <div className="alert alert-warning" role="status">
+                {t("branding.checkPartial", { reason: checkWarning })}
+              </div>
+            )}
             <ul className="name-grid">
               {idn.nameSuggestions.map((n) => {
                 const selected = n.name === channel.name;
                 return (
                   <li key={n.name} className={selected ? "name selected" : "name"}>
                     <strong>{n.name}</strong>
+                    <AvailabilityChip availability={n.availability} handle={n.handle} />
                     <p className="small muted">{n.rationale}</p>
                     <button
                       type="button"
