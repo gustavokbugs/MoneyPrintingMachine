@@ -1,0 +1,91 @@
+package httpapi
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+
+	"contentfactory/internal/channel"
+	"contentfactory/internal/jobs"
+	"contentfactory/internal/launchpad"
+)
+
+// maxBodyBytes bounds request bodies. Blueprints are the largest payloads.
+const maxBodyBytes = 1 << 20
+
+// ErrorBody is the stable error response shape.
+type ErrorBody struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Field   string `json:"field,omitempty"`
+	} `json:"error"`
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
+	writeFieldError(w, status, code, message, "")
+}
+
+func writeFieldError(w http.ResponseWriter, status int, code, message, field string) {
+	var b ErrorBody
+	b.Error.Code, b.Error.Message, b.Error.Field = code, message, field
+	writeJSON(w, status, b)
+}
+
+// decode reads a JSON body strictly into dst.
+func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		var mbe *http.MaxBytesError
+		switch {
+		case errors.As(err, &mbe):
+			writeError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "Request body is too large.")
+		case errors.Is(err, io.EOF):
+			writeError(w, http.StatusBadRequest, "invalid_body", "Request body is required.")
+		default:
+			writeError(w, http.StatusBadRequest, "invalid_body", fmt.Sprintf("Request body is invalid: %v", err))
+		}
+		return false
+	}
+	if dec.More() {
+		writeError(w, http.StatusBadRequest, "invalid_body", "Request body must contain a single JSON object.")
+		return false
+	}
+	return true
+}
+
+// writeDomainError maps domain errors to HTTP responses. Unknown errors are
+// logged and reported generically so internals do not leak.
+func (s *server) writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
+	var ve *channel.ValidationError
+	var te *channel.TransitionError
+	switch {
+	case errors.As(err, &ve):
+		writeFieldError(w, http.StatusUnprocessableEntity, "validation_failed", ve.Error(), ve.Field)
+	case errors.As(err, &te):
+		writeError(w, http.StatusConflict, "invalid_transition", te.Error())
+	case errors.Is(err, channel.ErrNotFound):
+		writeError(w, http.StatusNotFound, "channel_not_found", "Channel not found.")
+	case errors.Is(err, channel.ErrConflict):
+		writeError(w, http.StatusConflict, "conflict", "The channel was modified by another operation. Reload and try again.")
+	case errors.Is(err, jobs.ErrNotFound):
+		writeError(w, http.StatusNotFound, "job_not_found", "Job not found.")
+	case errors.Is(err, launchpad.ErrSavedNicheNotFound):
+		writeError(w, http.StatusNotFound, "saved_niche_not_found", "Saved niche not found.")
+	case errors.Is(err, launchpad.ErrSavedNicheExists):
+		writeError(w, http.StatusConflict, "saved_niche_exists", err.Error())
+	default:
+		s.Log.Error("request failed", "path", r.URL.Path, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal", "An unexpected error occurred.")
+	}
+}
