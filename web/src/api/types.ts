@@ -164,6 +164,7 @@ export interface Niche {
     searchInterest: number | null;
     metrics: TrendMetrics | null;
     collectedAt: string | null;
+    news: MentionStats | null;
     sources: string[];
   };
 }
@@ -272,4 +273,56 @@ export interface TrendResult {
 export interface Integrations {
   youtubeDataApi: { configured: boolean; quota: { usedToday: number; limit: number } | null };
   youtubeOAuth: { configured: boolean };
+}
+
+export interface MentionStats {
+  recent7d: number;
+  previous7d: number;
+  momentumPercent: number | null;
+  activeFeeds: number;
+}
+
+export interface Watch {
+  id: number;
+  query: string;
+  queryKey: string;
+  region: string;
+  language: string;
+  source: "channel" | "manual";
+  active: boolean;
+  nextDueAt: string;
+  lastMeasuredAt: string | null;
+  lastError: string;
+  createdAt: string;
+}
+
+export interface TrendPoint {
+  collectedAt: string;
+  medianViewsPerDay: number;
+  sampleSize: number;
+  scores: { demand: number | null; competition: number | null; momentumPercent: number | null; trend: number | null };
+}
+
+export type FeedStatus = "pending" | "ok" | "not_modified" | "error";
+
+export interface Feed {
+  id: number;
+  url: string;
+  title: string;
+  active: boolean;
+  nextFetchAt: string;
+  lastFetchedAt: string | null;
+  lastStatus: FeedStatus;
+  lastError: string;
+  itemCount: number;
+  createdAt: string;
+}
+
+export interface RefreshResult {
+  measured: number;
+  failed: number;
+  stopped?: string;
+  feedsFetched: number;
+  feedsFailed: number;
+  itemsPruned: number;
 }

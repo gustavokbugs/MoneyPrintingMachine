@@ -11,6 +11,7 @@ import type {
   ChannelStatus,
   Health,
   Identity,
+  Feed,
   Integrations,
   Job,
   LaunchReview,
@@ -19,7 +20,9 @@ import type {
   SavedNiche,
   Strategy,
   TrendResult,
+  TrendPoint,
   TrendSnapshot,
+  Watch,
 } from "./types";
 
 /** ApiError carries the server's stable error code and message. */
@@ -162,6 +165,24 @@ export const api = {
   disconnectYouTube: async (id: string) => {
     await request("DELETE", `/api/channels/${encodeURIComponent(id)}/connections/youtube`);
   },
+
+  watchlist: async () => asItems(await request("GET", "/api/trends/watchlist"), asRecordOf<Watch>("watch", ["id", "query"])),
+  addWatch: async (query: string, region: string) =>
+    asRecordOf<Watch>("watch", ["id", "query"])(await request("POST", "/api/trends/watchlist", { query, region, language: "en-US" })),
+  deleteWatch: async (id: number) => {
+    await request("DELETE", `/api/trends/watchlist/${id}`);
+  },
+  trajectory: async (w: Pick<Watch, "query" | "region" | "language">) =>
+    asItems(
+      await request("GET", `/api/trends/trajectory?${new URLSearchParams({ query: w.query, region: w.region, language: w.language }).toString()}`),
+      asRecordOf<TrendPoint>("trend point", ["collectedAt", "scores"]),
+    ),
+  feeds: async () => asItems(await request("GET", "/api/trends/feeds"), asRecordOf<Feed>("feed", ["id", "url", "lastStatus"])),
+  addFeed: async (url: string) => asRecordOf<Feed>("feed", ["id", "url"])(await request("POST", "/api/trends/feeds", { url })),
+  deleteFeed: async (id: number) => {
+    await request("DELETE", `/api/trends/feeds/${id}`);
+  },
+  refreshTrends: async (key: string) => asJob(await request("POST", "/api/trends/refresh", undefined, idem(key))),
 
   platforms: async () =>
     asItems(await request("GET", "/api/platforms"), asRecordOf<PlatformCapability>("platform", ["platform", "steps"])),
