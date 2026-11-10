@@ -383,7 +383,7 @@ func (s *server) launchReview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) listPlatforms(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"items": platforms.Catalog()})
+	writeJSON(w, http.StatusOK, map[string]any{"items": platforms.Catalog(s.YouTube != nil && s.YouTube.Configured())})
 }
 
 func (s *server) getJob(w http.ResponseWriter, r *http.Request) {

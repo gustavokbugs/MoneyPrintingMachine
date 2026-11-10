@@ -40,8 +40,9 @@ type Capability struct {
 
 // Catalog returns the platform capability catalog. Figures that public
 // sources disagree on are marked "verify" and must be confirmed against
-// the official documentation before relying on them.
-func Catalog() []Capability {
+// the official documentation before relying on them. youtubeReady reports
+// whether the YouTube OAuth integration is configured.
+func Catalog(youtubeReady bool) []Capability {
 	return []Capability{
 		{
 			Platform:        "youtube",
@@ -62,10 +63,11 @@ func Catalog() []Capability {
 				{ID: "oauth", Title: "Sign in with Google", Description: "Authorize this app with OAuth 2.0. Passwords are never entered into or stored by this app.", Automation: UserAction},
 				{ID: "create", Title: "Create the channel on YouTube", Description: "If the Google account has no channel for this brand, create one in YouTube. Use the generated name and handle suggestions.", Automation: UserAction, URL: "https://www.youtube.com/create_channel"},
 				{ID: "detect", Title: "Detect and verify the channel", Description: "The app lists the channels the authorized account can manage and saves the selected channel ID.", Automation: Verified},
-				{ID: "profile", Title: "Apply profile information", Description: "Description and keywords can be set through the API. Avatar and banner uploads use the channel branding endpoints where available; otherwise upload them in YouTube Studio.", Automation: Automated},
+				{ID: "profile", Title: "Apply profile information", Description: "Paste the generated description and keywords and upload the avatar and banner in YouTube Studio. Editing them through the API needs a broader permission that this app does not request yet.", Automation: UserAction, URL: "https://studio.youtube.com/"},
 				{ID: "permissions", Title: "Verify upload and analytics permissions", Description: "The app checks the granted scopes and confirms it can read the channel.", Automation: Verified},
 			},
-			LastReviewed: "2026-11-10",
+			IntegrationReady: youtubeReady,
+			LastReviewed:     "2026-11-10",
 		},
 		{
 			Platform:        "tiktok",
