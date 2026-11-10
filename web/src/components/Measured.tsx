@@ -1,3 +1,4 @@
+import { ChartNoAxesColumn } from "lucide-react";
 import type { Niche } from "../api/types";
 import { formatDateTime, t } from "../i18n";
 
@@ -29,9 +30,7 @@ function Score({ label, value, suffix = "" }: { label: string; value: number | n
   return (
     <div>
       <dt>{label}</dt>
-      <dd className={value === null ? "muted" : "measured-value"}>
-        {value === null ? t("launchpad.notMeasuredYet") : `${num.format(value)}${suffix}`}
-      </dd>
+      <dd className={value === null ? "muted" : undefined}>{value === null ? t("launchpad.notMeasuredYet") : `${num.format(value)}${suffix}`}</dd>
     </div>
   );
 }
@@ -39,35 +38,39 @@ function Score({ label, value, suffix = "" }: { label: string; value: number | n
 /** MeasuredBlock shows YouTube measurements, clearly separated from estimates. */
 export function MeasuredBlock({ niche }: { niche: Niche }) {
   const m = niche.measured;
-  if (!m.metrics || !m.collectedAt) {
-    return <p className="small muted">{t("common.notMeasured")}</p>;
-  }
-  const momentum = m.momentumPercent === null ? null : m.momentumPercent;
   return (
     <div className="measured">
-      <p className="small">
-        <strong>{t("launchpad.measuredTitle")}</strong>{" "}
-        <span className="muted">{t("launchpad.collected", { date: formatDateTime(m.collectedAt) })}</span>
-      </p>
-      <dl className="ratings">
-        <Score label={t("launchpad.demand")} value={m.demandScore} />
-        <Score label={t("launchpad.competition")} value={m.competitionScore} />
-        <Score label={t("launchpad.trend")} value={m.trendScore} />
-        <Score label={t("launchpad.momentum")} value={momentum} suffix="%" />
-        <div>
-          <dt>{t("launchpad.medianViewsPerDay")}</dt>
-          <dd>{compact.format(m.metrics.medianViewsPerDay)}</dd>
-        </div>
-        <div>
-          <dt>{t("launchpad.channelsInSample", { count: m.metrics.sampleSize })}</dt>
-          <dd>{m.metrics.distinctChannels}</dd>
-        </div>
-        <div>
-          <dt>{t("launchpad.medianSubs")}</dt>
-          <dd>{m.metrics.medianSubscribers === null ? "—" : compact.format(m.metrics.medianSubscribers)}</dd>
-        </div>
-      </dl>
-      <p className="small muted">{t("launchpad.measuredHelp")}</p>
+      <span className="data-origin">
+        <ChartNoAxesColumn size={14} aria-hidden="true" />
+        {t("launchpad.measuredTitle")}
+      </span>
+      {!m.metrics || !m.collectedAt ? (
+        <p className="small muted">{t("launchpad.notMeasuredHint")}</p>
+      ) : (
+        <>
+          <dl className="metric-grid">
+            <Score label={t("launchpad.demand")} value={m.demandScore} />
+            <Score label={t("launchpad.competition")} value={m.competitionScore} />
+            <Score label={t("launchpad.trend")} value={m.trendScore} />
+            <Score label={t("launchpad.momentum")} value={m.momentumPercent} suffix="%" />
+            <div>
+              <dt>{t("launchpad.medianViewsPerDay")}</dt>
+              <dd>{compact.format(m.metrics.medianViewsPerDay)}</dd>
+            </div>
+            <div>
+              <dt>{t("launchpad.channelsInSample", { count: m.metrics.sampleSize })}</dt>
+              <dd>{m.metrics.distinctChannels}</dd>
+            </div>
+            <div>
+              <dt>{t("launchpad.medianSubs")}</dt>
+              <dd>{m.metrics.medianSubscribers === null ? "—" : compact.format(m.metrics.medianSubscribers)}</dd>
+            </div>
+          </dl>
+          <p className="xs muted">
+            {t("launchpad.collected", { date: formatDateTime(m.collectedAt) })} · {t("launchpad.measuredHelp")}
+          </p>
+        </>
+      )}
     </div>
   );
 }
