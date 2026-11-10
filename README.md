@@ -117,6 +117,7 @@ Set `TEST_DATABASE_URL` to run the PostgreSQL integration tests; they create and
 - [Architecture](docs/architecture.md)
 - [Channel lifecycle](docs/channel-lifecycle.md)
 - [Platform capabilities and limits](docs/platform-capabilities.md)
+- [UI design system](design-system/content-factory/MASTER.md): tokens, components, and accessibility rules for the web app, derived from the vendored [ui-ux-pro-max](.claude/skills/ui-ux-pro-max/SOURCE.md) skill. Read it before changing UI.
 
 ## Troubleshooting
 
