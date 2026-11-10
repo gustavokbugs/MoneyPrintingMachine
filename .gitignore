@@ -21,3 +21,4 @@ web/dist/
 backend/bin/
 *.exe
 coverage/
+*.tsbuildinfo
