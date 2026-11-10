@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, newIdempotencyKey } from "../api/client";
 import { asNicheReport } from "../api/guards";
 import type { Niche, NicheReport } from "../api/types";
+import { MeasuredBlock, sortNiches, type NicheSort } from "../components/Measured";
 import { Empty, ErrorState, JobProgress, Loading, RatingChip, Section, StatusBadge, TagList, errorMessage } from "../components/ui";
 import { useJob } from "../hooks/useJob";
 import { formatDateTime, t, type MessageKey } from "../i18n";
@@ -50,6 +51,8 @@ export function Launchpad() {
   const [query, setQuery] = useState("");
   const [manualNiche, setManualNiche] = useState("");
   const [compare, setCompare] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<NicheSort>("heuristic");
+  const integrations = useQuery({ queryKey: ["integrations"], queryFn: api.integrations, refetchInterval: 60_000 });
 
   const job = useJob(jobId);
   const report = job.data?.status === "succeeded" ? parseReport(job.data.result) : null;
@@ -150,8 +153,28 @@ export function Launchpad() {
                     {report.model} · {formatDateTime(report.generatedAt)}
                   </p>
                 </div>
+                <div className="row wrap between">
+                  <div className="row">
+                    <label htmlFor="niche-sort" className="inline-label">
+                      {t("launchpad.sortBy")}
+                    </label>
+                    <select id="niche-sort" value={sortBy} onChange={(e) => setSortBy(e.target.value as NicheSort)}>
+                      <option value="heuristic">{t("launchpad.sort.heuristic")}</option>
+                      <option value="demand">{t("launchpad.sort.demand")}</option>
+                      <option value="competition">{t("launchpad.sort.competition")}</option>
+                    </select>
+                  </div>
+                  {integrations.data?.youtubeDataApi.quota && (
+                    <span className="small muted">
+                      {t("launchpad.quota", {
+                        used: integrations.data.youtubeDataApi.quota.usedToday,
+                        limit: integrations.data.youtubeDataApi.quota.limit,
+                      })}
+                    </span>
+                  )}
+                </div>
                 <ol className="niche-list">
-                  {report.niches.map((n) => (
+                  {sortNiches(report.niches, sortBy).map((n) => (
                     <li key={n.name} className="niche">
                       <div className="niche-head">
                         <h3>{n.name}</h3>
@@ -171,15 +194,8 @@ export function Launchpad() {
                             </dd>
                           </div>
                         ))}
-                        <div>
-                          <dt>{t("launchpad.measuredTrend")}</dt>
-                          <dd className="muted">{n.measured.trendScore ?? t("common.notMeasured")}</dd>
-                        </div>
-                        <div>
-                          <dt>{t("launchpad.measuredCompetition")}</dt>
-                          <dd className="muted">{n.measured.competitionScore ?? t("common.notMeasured")}</dd>
-                        </div>
                       </dl>
+                      <MeasuredBlock niche={n} />
                       <details>
                         <summary>{t("launchpad.subNiches")}</summary>
                         <TagList items={n.subNiches} />
