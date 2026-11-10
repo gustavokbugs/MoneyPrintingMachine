@@ -1,0 +1,11 @@
+# Keep LF line endings in the repository and the working tree on every OS,
+# so gofmt/prettier output matches what git stores.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+*.ttf binary
+*.wav binary
+*.mp4 binary
