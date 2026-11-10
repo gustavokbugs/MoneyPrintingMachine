@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { Channel } from "../api/types";
 import { Empty, ErrorState, Loading, StatusBadge, errorMessage } from "../components/ui";
-import { formatCalendarDate, t } from "../i18n";
+import { formatCalendarDate, t, type MessageKey } from "../i18n";
 
 /** nextPublication returns the first calendar entry on or after today. */
 export function nextPublication(c: Channel, today: string): string | null {
@@ -136,7 +136,11 @@ export function Dashboard() {
                         <StatusBadge status={c.status} />
                       </td>
                       <td>{c.niche || "—"}</td>
-                      <td className="muted">{t("dashboard.noPlatforms")}</td>
+                      <td className={c.connectedPlatforms?.length ? "" : "muted"}>
+                        {c.connectedPlatforms?.length
+                          ? c.connectedPlatforms.map((p) => t(`platform.${p}` as MessageKey)).join(", ")
+                          : t("dashboard.noPlatforms")}
+                      </td>
                       <td>{nextPublication(c, today) ?? "—"}</td>
                       <td className="muted">{t("dashboard.noAnalytics")}</td>
                     </tr>
