@@ -28,7 +28,8 @@ export function completed(step: StepId, c: Channel): boolean {
     case "branding":
       return c.identity !== null && c.name !== "";
     case "platforms":
-      return false; // Requires a verified connection; none can exist yet.
+      // Ready and later states require a verified connection.
+      return c.status === "ready" || c.status === "active" || c.status === "paused";
     case "blueprint":
       return c.blueprint !== null;
     case "review":

@@ -1,12 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { ErrorState, Loading, Section, TagList } from "../../components/ui";
 import { formatCalendarDate, t, type MessageKey } from "../../i18n";
 import type { StepProps } from "../ChannelWizard";
+import { YouTubeConnection, parseOutcome } from "./YouTubeConnection";
 
 export function PlatformStep({ channel, goTo }: StepProps) {
   const catalog = useQuery({ queryKey: ["platforms"], queryFn: api.platforms, staleTime: Infinity });
   const connections = useQuery({ queryKey: ["connections", channel.id], queryFn: () => api.connections(channel.id) });
+  const [params] = useSearchParams();
+  const outcome = parseOutcome(params.get("youtube"));
 
   return (
     <div className="stack">
@@ -27,8 +31,10 @@ export function PlatformStep({ channel, goTo }: StepProps) {
                 </dd>
               </div>
             </dl>
-            {!p.integrationReady && (
-              <div className="alert alert-warning">{t("platforms.notReady", { platform: p.displayName })}</div>
+            {p.platform === "youtube" ? (
+              <YouTubeConnection channel={channel} connection={conn} outcome={outcome} />
+            ) : (
+              !p.integrationReady && <div className="alert alert-warning">{t("platforms.notReady", { platform: p.displayName })}</div>
             )}
             <h3>{t("platforms.steps")}</h3>
             <ol className="steps-list">
