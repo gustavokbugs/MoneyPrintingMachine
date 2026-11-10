@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"contentfactory/internal/channel"
+	"contentfactory/internal/jobs"
 	"contentfactory/internal/rss"
 	"contentfactory/internal/trends"
 )
@@ -122,5 +123,27 @@ func TestFeedRepository(t *testing.T) {
 	}
 	if err := r.Delete(ctx, "alice", f.ID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestPruneFinishedJobs(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	store := NewJobStore(pool)
+	enq := jobs.NewEnqueuer(store)
+	old, _ := enq.Enqueue(ctx, jobs.NewJob{OwnerID: "alice", Kind: "k"})
+	queued, _ := enq.Enqueue(ctx, jobs.NewJob{OwnerID: "alice", Kind: "k"})
+	if err := store.Complete(ctx, old.ID, []byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE jobs SET updated_at = now() - interval '40 days'`); err != nil {
+		t.Fatal(err)
+	}
+	n, err := store.PruneFinished(ctx, time.Now().Add(-30*24*time.Hour))
+	if err != nil || n != 1 {
+		t.Fatalf("pruned %d, err %v", n, err)
+	}
+	if _, err := store.Get(ctx, "alice", queued.ID); err != nil {
+		t.Fatal("queued jobs must never be pruned")
 	}
 }

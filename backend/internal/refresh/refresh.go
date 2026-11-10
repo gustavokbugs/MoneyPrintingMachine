@@ -31,6 +31,14 @@ type FeedPoller interface {
 	FetchDue(ctx context.Context, limit int) (rss.FetchReport, error)
 }
 
+// JobPruner deletes old finished jobs.
+type JobPruner interface {
+	PruneFinished(ctx context.Context, before time.Time) (int64, error)
+}
+
+// JobRetention is how long finished jobs are kept.
+const JobRetention = 30 * 24 * time.Hour
+
 // Result is the job result.
 type Result struct {
 	Measured     int    `json:"measured"`
@@ -39,17 +47,24 @@ type Result struct {
 	FeedsFetched int    `json:"feedsFetched"`
 	FeedsFailed  int    `json:"feedsFailed"`
 	ItemsPruned  int64  `json:"itemsPruned"`
+	JobsPruned   int64  `json:"jobsPruned"`
 }
 
 // Handler returns the job handler. Feeds are polled even when trend
 // measurement fails, and vice versa; the job fails only if both fail.
-func Handler(tr TrendRefresher, feeds FeedPoller) jobs.Handler {
+// Pruning old jobs is best effort and never fails the run.
+func Handler(tr TrendRefresher, feeds FeedPoller, pruner JobPruner) jobs.Handler {
 	return func(ctx context.Context, _ jobs.Job) (any, error) {
 		var res Result
 		rep, trendErr := tr.RunOnce(ctx)
 		res.Measured, res.Failed, res.Stopped = rep.Measured, rep.Failed, rep.Stopped
 		frep, feedErr := feeds.FetchDue(ctx, FeedsPerRun)
 		res.FeedsFetched, res.FeedsFailed, res.ItemsPruned = frep.Fetched, frep.Failed, frep.Pruned
+		if pruner != nil {
+			if n, err := pruner.PruneFinished(ctx, time.Now().Add(-JobRetention)); err == nil {
+				res.JobsPruned = n
+			}
+		}
 		if trendErr != nil && feedErr != nil {
 			return nil, fmt.Errorf("trend refresh: %v; feed polling: %w", trendErr, feedErr)
 		}

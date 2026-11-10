@@ -28,23 +28,35 @@ type fakeFeeds struct {
 
 func (f fakeFeeds) FetchDue(context.Context, int) (rss.FetchReport, error) { return f.rep, f.err }
 
+type fakePruner struct{ before time.Time }
+
+func (f *fakePruner) PruneFinished(_ context.Context, before time.Time) (int64, error) {
+	f.before = before
+	return 4, nil
+}
+
 func TestHandler(t *testing.T) {
-	ok := Handler(fakeTrends{rep: trends.RunReport{Measured: 2}}, fakeFeeds{rep: rss.FetchReport{Fetched: 3, Pruned: 7}})
+	pruner := &fakePruner{}
+	ok := Handler(fakeTrends{rep: trends.RunReport{Measured: 2}}, fakeFeeds{rep: rss.FetchReport{Fetched: 3, Pruned: 7}}, pruner)
 	res, err := ok(context.Background(), jobs.Job{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := res.(Result); r.Measured != 2 || r.FeedsFetched != 3 || r.ItemsPruned != 7 || r.Stopped != "" {
+	if r := res.(Result); r.Measured != 2 || r.FeedsFetched != 3 || r.ItemsPruned != 7 || r.JobsPruned != 4 || r.Stopped != "" {
 		t.Fatalf("unexpected result: %+v", r)
 	}
 
-	partial := Handler(fakeTrends{err: errors.New("db")}, fakeFeeds{rep: rss.FetchReport{Fetched: 1}})
+	if d := time.Since(pruner.before); d < JobRetention || d > JobRetention+time.Minute {
+		t.Fatalf("prune cutoff off by %v", d-JobRetention)
+	}
+
+	partial := Handler(fakeTrends{err: errors.New("db")}, fakeFeeds{rep: rss.FetchReport{Fetched: 1}}, nil)
 	res, err = partial(context.Background(), jobs.Job{})
 	if err != nil || res.(Result).FeedsFetched != 1 || res.(Result).Stopped == "" {
 		t.Fatalf("a failing half must not fail the job: %+v %v", res, err)
 	}
 
-	both := Handler(fakeTrends{err: errors.New("db")}, fakeFeeds{err: errors.New("db")})
+	both := Handler(fakeTrends{err: errors.New("db")}, fakeFeeds{err: errors.New("db")}, nil)
 	if _, err := both(context.Background(), jobs.Job{}); err == nil {
 		t.Fatal("expected error when both halves fail")
 	}

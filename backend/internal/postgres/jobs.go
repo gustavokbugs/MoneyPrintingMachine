@@ -126,3 +126,13 @@ func (s *JobStore) Fail(ctx context.Context, id string, msg string, retryAt *tim
 	}
 	return nil
 }
+
+// PruneFinished deletes succeeded and failed jobs last updated before the
+// cutoff. Queued and running jobs are never removed.
+func (s *JobStore) PruneFinished(ctx context.Context, before time.Time) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM jobs WHERE status IN ('succeeded', 'failed') AND updated_at < $1`, before)
+	if err != nil {
+		return 0, fmt.Errorf("prune jobs: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}

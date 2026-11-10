@@ -86,7 +86,7 @@ func run(log *slog.Logger) error {
 	engine.WithMeasurer(yt.trends).WithHandleLookup(yt.data).WithNews(feeds)
 
 	handlers := engine.Handlers(channels)
-	handlers[refresh.KindTrendRefresh] = refresh.Handler(trends.NewRefresher(watchlist, yt.trends), feeds)
+	handlers[refresh.KindTrendRefresh] = refresh.Handler(trends.NewRefresher(watchlist, yt.trends), feeds, jobStore)
 
 	runner := jobs.NewRunner(jobStore, handlers, jobs.RunnerConfig{
 		Concurrency: cfg.WorkerConcurrency,
