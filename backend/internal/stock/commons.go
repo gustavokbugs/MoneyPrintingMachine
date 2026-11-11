@@ -11,7 +11,9 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
@@ -29,11 +31,16 @@ const (
 type Commons struct {
 	http *http.Client
 	base string
+	// gap spaces requests so a burst of searches stays within the API's
+	// fair-use limits; last is guarded by mu.
+	gap  time.Duration
+	mu   sync.Mutex
+	last time.Time
 }
 
 // NewCommons builds a Wikimedia Commons client.
 func NewCommons(timeout time.Duration) *Commons {
-	c := &Commons{base: "https://commons.wikimedia.org/w/api.php"}
+	c := &Commons{base: "https://commons.wikimedia.org/w/api.php", gap: 700 * time.Millisecond}
 	c.http = &http.Client{Timeout: timeout, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) > 5 || !allowedFileHost(req.URL) {
 			return errors.New("unexpected redirect")
@@ -46,6 +53,65 @@ func NewCommons(timeout time.Duration) *Commons {
 // userAgent identifies the tool as Wikimedia's API policy asks, without
 // personal details.
 const userAgent = "ContentFactory/0.1 (self-hosted video tool; Go net/http)"
+
+// maxRetryWait bounds how long one rate-limited search waits to retry.
+const maxRetryWait = 15 * time.Second
+
+// get paces requests and retries once after a 429, honoring Retry-After
+// up to maxRetryWait.
+func (c *Commons) get(ctx context.Context, u string) (*http.Response, error) {
+	for attempt := 0; ; attempt++ {
+		if err := c.wait(ctx); err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", userAgent)
+		resp, err := c.http.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("commons search: %w", err)
+		}
+		if resp.StatusCode != http.StatusTooManyRequests {
+			return resp, nil
+		}
+		resp.Body.Close()
+		if attempt > 0 {
+			return nil, fmt.Errorf("wikimedia commons: %w", ErrRateLimited)
+		}
+		delay := 5 * time.Second
+		if s, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil && s >= 0 {
+			delay = time.Duration(s) * time.Second
+		}
+		if delay > maxRetryWait {
+			return nil, fmt.Errorf("wikimedia commons: %w", ErrRateLimited)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(delay):
+		}
+	}
+}
+
+// wait blocks until gap has passed since the previous request.
+func (c *Commons) wait(ctx context.Context) error {
+	c.mu.Lock()
+	next := c.last.Add(c.gap)
+	now := time.Now()
+	if next.Before(now) {
+		next = now
+	}
+	c.last = next
+	c.mu.Unlock()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(time.Until(next)):
+		return nil
+	}
+}
 
 // Available is always true: Commons needs no key.
 func (c *Commons) Available() bool { return c != nil }
@@ -105,19 +171,11 @@ func (c *Commons) Search(ctx context.Context, query, _ string, width, height, pe
 	q.Set("iiprop", "url|size|mime|extmetadata")
 	q.Set("iiextmetadatafilter", "License|LicenseShortName|Artist|ObjectName")
 	q.Set("iiurlwidth", fmt.Sprint(max(width, height)))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"?"+q.Encode(), nil)
+	resp, err := c.get(ctx, c.base+"?"+q.Encode())
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", userAgent)
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("commons search: %w", err)
-	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, ErrRateLimited
-	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("commons search: HTTP %d", resp.StatusCode)
 	}

@@ -23,8 +23,9 @@ import (
 // ErrNoKey means PEXELS_API_KEY is not configured.
 var ErrNoKey = errors.New("stock footage needs PEXELS_API_KEY (free at https://www.pexels.com/api/)")
 
-// ErrRateLimited means the Pexels quota (200 requests/hour) is used up.
-var ErrRateLimited = errors.New("pexels rate limit reached; try again later")
+// ErrRateLimited means a provider's request quota is used up for now
+// (Pexels allows 200 requests per hour). Errors wrap it with the provider.
+var ErrRateLimited = errors.New("stock search rate limit reached; try again later")
 
 // MaxDownloadBytes bounds one clip download.
 const MaxDownloadBytes = 120 << 20
@@ -117,7 +118,7 @@ func (c *Client) Search(ctx context.Context, query, orientation string, width, h
 	defer resp.Body.Close()
 	switch {
 	case resp.StatusCode == http.StatusTooManyRequests:
-		return nil, ErrRateLimited
+		return nil, fmt.Errorf("pexels: %w", ErrRateLimited)
 	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
 		return nil, errors.New("pexels rejected the API key")
 	case resp.StatusCode != http.StatusOK:

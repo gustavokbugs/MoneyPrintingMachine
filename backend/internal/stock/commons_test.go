@@ -82,3 +82,53 @@ func TestPreferRelevantTitles(t *testing.T) {
 		t.Error("no matches should keep everything")
 	}
 }
+
+func TestCommonsRetriesOnceAfterRateLimit(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		_, _ = w.Write([]byte(commonsSample))
+	}))
+	defer srv.Close()
+	c := NewCommons(5 * time.Second)
+	c.base, c.gap = srv.URL, 0
+	if clips, err := c.Search(context.Background(), "moon", "", 1080, 1920, 10); err != nil || len(clips) != 2 || calls != 2 {
+		t.Fatalf("clips=%d err=%v calls=%d, want a successful retry", len(clips), err, calls)
+	}
+
+	// A second 429, or a Retry-After beyond the cap, gives up with ErrRateLimited.
+	always := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "3600")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer always.Close()
+	c.base = always.URL
+	if _, err := c.Search(context.Background(), "moon", "", 1080, 1920, 10); !errors.Is(err, ErrRateLimited) || !strings.Contains(err.Error(), "wikimedia") {
+		t.Fatalf("err = %v, want a wikimedia rate-limit error", err)
+	}
+}
+
+func TestCommonsPacesRequests(t *testing.T) {
+	c := NewCommons(time.Second)
+	c.gap = 40 * time.Millisecond
+	start := time.Now()
+	for range 3 {
+		if err := c.wait(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if d := time.Since(start); d < 80*time.Millisecond {
+		t.Errorf("three requests took %v, want at least two gaps", d)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	c.gap = time.Hour
+	if err := c.wait(ctx); err == nil {
+		t.Error("wait must honor cancellation")
+	}
+}
