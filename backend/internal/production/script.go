@@ -102,7 +102,7 @@ func (s *Service) GenerateScript(ctx context.Context, ch *channel.Channel, v *Vi
 		// Viral formats: many short beats, one per section.
 		system = shortSystemPrompt
 		if !dialogue {
-			sections = min(max(words/15, 4), 8)
+			sections = min(max(words/15, 4), 12)
 		}
 		shape = f.Guide + "\nThe hook is one line that makes scrolling past impossible.\nThe outro is one short punchline line; at most add \"follow for more\"."
 	}

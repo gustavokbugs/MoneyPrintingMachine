@@ -15,7 +15,7 @@ const (
 )
 
 // ShortFormatSeconds is the default length of the short viral formats.
-const ShortFormatSeconds = 35
+const ShortFormatSeconds = 60
 
 // StoryFormat describes one format for the UI and the script prompt.
 type StoryFormat struct {
@@ -50,7 +50,7 @@ Example beats on another topic (copy the rhythm, not the content): "You're cold.
 }
 
 // ShortPace is the narration speed of the short formats.
-const ShortPace = 1.2
+const ShortPace = 1.1
 
 // paceOf returns the narration speed for a video's format (1 = normal).
 func paceOf(format string) float64 {
