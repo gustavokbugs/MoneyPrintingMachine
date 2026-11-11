@@ -220,7 +220,7 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
             </Button>
           </div>
           <p className="xs muted">{t(`video.styleHelp.${v.visualStyle}`)}</p>
-          {v.visualStyle === "footage" && tools && !tools.stockFootage && <Notice tone="warning">{t("video.footageNoKey")}</Notice>}
+          {v.visualStyle === "footage" && tools && !tools.stockFootage && <Notice tone="info">{t("video.footageNoKey")}</Notice>}
           {produceJob.jobId && <JobProgress job={produceJob.job.data} error={produceJob.job.error} />}
           {v.output && (
             <div className="stack-sm">
@@ -258,8 +258,10 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
                     {v.output.footage.map((c) => (
                       <li key={c.id}>
                         <a href={safeHttps(c.pageUrl)} target="_blank" rel="noreferrer">
+                          {c.title ? `${c.title} · ` : ""}
                           {c.author || t("video.footageUnknownAuthor")}
                         </a>
+                        {c.license ? ` (${c.license})` : null}
                       </li>
                     ))}
                   </ul>
@@ -285,6 +287,8 @@ function visualsLabel(visuals: string | undefined): string {
     return t("video.visuals.animated", { style: match ? t(`video.style.${match}`) : st });
   }
   if (visuals === "footage:pexels") return t("video.visuals.footage");
+  if (visuals === "footage:commons") return t("video.visuals.footageCommons");
+  if (visuals === "footage:mixed") return t("video.visuals.footageMixed");
   return t("video.visuals.solid");
 }
 

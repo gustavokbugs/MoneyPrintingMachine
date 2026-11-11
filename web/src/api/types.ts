@@ -423,4 +423,7 @@ export interface FootageCredit {
   pageUrl: string;
   author: string;
   authorUrl: string;
+  provider?: string;
+  license?: string;
+  title?: string;
 }
