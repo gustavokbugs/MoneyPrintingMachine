@@ -482,6 +482,8 @@ func RenderEffects(cues []SFXCue, seconds float64, seed string) *Track {
 			blip(tr, c.At, 2400, 0.012, 0.18)
 		case SFXChime:
 			bell(tr, c.At, 880, 0.3)
+		default:
+			renderWordEffect(tr, r, c)
 		}
 	}
 	return tr
