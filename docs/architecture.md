@@ -51,7 +51,8 @@ Dependencies point inward: `channel` knows nothing about HTTP, SQL, or models; a
 | Recommended fonts; Inter, Fraunces, JetBrains Mono, Space Grotesk (@fontsource 5.3.0) | SIL OFL 1.1 |
 | FFmpeg 8.1 (BtbN GPL build) | GPL-3.0; used as a separate program, not linked |
 | sherpa-onnx v2.0.1 | Apache 2.0 |
-| Kokoro 82M voice model (int8 en v0_19) | Apache 2.0 (verify on the model card) |
+| Kokoro 82M v1.0 voice model (fp32, sherpa-onnx export) | Apache 2.0 (verify on the model card) |
+| Music and sound effects | Generated in code (`internal/production/audio.go`); original, no third-party audio |
 | HyperFrames 0.8.209 | Apache 2.0; telemetry disabled through environment variables |
 | GSAP 3.15.0 | GSAP Standard No-Charge License (free, including commercial use; may not be used in a tool that competes with Webflow) |
 
@@ -60,6 +61,6 @@ Dependencies point inward: `channel` knows nothing about HTTP, SQL, or models; a
 1. Done: YouTube Data API trend snapshots (demand, competition, momentum) and handle checks.
 2. Done: YouTube OAuth connection with PKCE, encrypted tokens, and platform verification.
 3. Done: scheduled watchlist re-measurement (every 15 minutes as a durable job) and RSS feeds as a news-mention source.
-4. Done: production pipeline: scripts with claims and a fact-check gate, local narration (Kokoro TTS), animated scenes (HyperFrames HTML + GSAP rendered by headless Chrome, with a plain-background fallback), FFmpeg rendering with burned-in captions.
+4. Done: production pipeline: scripts with claims and a fact-check gate, local narration (Kokoro v1.0 TTS), animated scenes with transitions and word-by-word captions (HyperFrames HTML + GSAP rendered by headless Chrome, with a plain-background fallback), an original synthesized soundtrack (music bed ducked under the voice, effects on scene changes), and FFmpeg mastering to -14 LUFS.
 5. Done for YouTube: publishing with one upload per video and AI disclosure. Next: TikTok and Instagram connections.
 6. Analytics ingestion and the performance dashboard.

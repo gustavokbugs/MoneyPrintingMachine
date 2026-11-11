@@ -30,7 +30,8 @@ Last updated: 2026-11-10
 | Scheduled trend refresh (watchlist) | Done | Runs every 15 minutes as a durable job; YouTube measurements need G2 |
 | RSS news feeds as a trend source | Done | Add feeds on the Trends page; SSRF-protected fetcher |
 | Video production (script, fact-check gate, narration, render) | Done | Kokoro voice, FFmpeg, captions and SRT; UI on each video page |
-| Animated scenes (HyperFrames + GSAP) | Done | Styles: minimal, documentary, bold, tech, or auto from the niche; falls back to a plain background |
+| Animated scenes (HyperFrames + GSAP) | Done | Styles: minimal, documentary, bold, tech, or auto from the niche; transitions, word-by-word captions, counters; falls back to a plain background |
+| Narration and soundtrack | Done | Kokoro v1.0 (fp32) voices; original music and effects synthesized in code; mastered to -14 LUFS |
 | YouTube publishing (resumable upload) | Blocked | Code and UI done; needs G3/G4. Private by default, marked as synthetic media |
 
 ## 2. Open gaps
@@ -105,6 +106,7 @@ Last updated: 2026-11-10
 
 | Date | Change |
 | --- | --- |
+| 2026-11-10 | Kokoro v1.0 voices replace the int8 v0.19 model (removes buzz); synthesized music and effects; animated captions and transitions. |
 | 2026-11-10 | Media tools installed (G9); production and publishing UI built (G10); HyperFrames animated scenes with four styles. |
 | 2026-11-10 | Production pipeline backend added; PRs #1 and #2 merged; work continues on master. |
 | 2026-11-10 | Trend refresh and RSS milestone built; Ollama and qwen3:4b installed (G1 closed). |
