@@ -12,16 +12,20 @@ import type {
   Health,
   Identity,
   Feed,
+  ClaimStatus,
   Integrations,
   Job,
   LaunchReview,
   PlatformCapability,
   PlatformConnection,
+  ProductionStatus,
   SavedNiche,
   Strategy,
   TrendResult,
   TrendPoint,
   TrendSnapshot,
+  Video,
+  VideoScript,
   Watch,
 } from "./types";
 
@@ -183,6 +187,24 @@ export const api = {
     await request("DELETE", `/api/trends/feeds/${id}`);
   },
   refreshTrends: async (key: string) => asJob(await request("POST", "/api/trends/refresh", undefined, idem(key))),
+
+  productionStatus: async () =>
+    asRecordOf<ProductionStatus>("production status", ["ready", "missing", "voices"])(await request("GET", "/api/production/status")),
+  listVideos: async (channelId: string) =>
+    asItems(await request("GET", `/api/channels/${encodeURIComponent(channelId)}/videos`), asRecordOf<Video>("video", ["id", "status"])),
+  createVideo: async (channelId: string, ideaIndex: number) =>
+    asRecordOf<Video>("video", ["id", "status"])(await request("POST", `/api/channels/${encodeURIComponent(channelId)}/videos`, { ideaIndex })),
+  getVideo: async (id: string) => asRecordOf<Video>("video", ["id", "status"])(await request("GET", `/api/videos/${encodeURIComponent(id)}`)),
+  putVideoScript: async (id: string, script: VideoScript) =>
+    asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/script`, script)),
+  reviewClaim: async (id: string, index: number, status: ClaimStatus, note = "") =>
+    asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/claims/${index}`, { status, note })),
+  approveVideo: async (id: string) => asRecordOf<Video>("video", ["id", "status"])(await request("POST", `/api/videos/${encodeURIComponent(id)}/approve`)),
+  setVoice: async (id: string, voiceId: number) =>
+    asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/voice`, { voiceId })),
+  generateVideoScript: async (id: string, key: string) => asJob(await request("POST", `/api/videos/${encodeURIComponent(id)}/script/generate`, undefined, idem(key))),
+  produceVideo: async (id: string, key: string) => asJob(await request("POST", `/api/videos/${encodeURIComponent(id)}/produce`, undefined, idem(key))),
+  videoMediaUrl: (id: string, file: "video.mp4" | "captions.srt", version: number) => `/api/videos/${encodeURIComponent(id)}/media/${file}?v=${version}`,
 
   platforms: async () =>
     asItems(await request("GET", "/api/platforms"), asRecordOf<PlatformCapability>("platform", ["platform", "steps"])),

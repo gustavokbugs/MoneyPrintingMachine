@@ -326,3 +326,62 @@ export interface RefreshResult {
   feedsFailed: number;
   itemsPruned: number;
 }
+
+export type VideoStatus = "planned" | "scripting" | "script_ready" | "approved" | "producing" | "produced" | "failed";
+export type ClaimStatus = "unverified" | "verified" | "removed";
+
+export interface ScriptSection {
+  heading: string;
+  narration: string;
+  onScreenText: string;
+}
+
+export interface Claim {
+  text: string;
+  sourceHint: string;
+  status: ClaimStatus;
+  note: string;
+}
+
+export interface VideoScript {
+  hook: string;
+  sections: ScriptSection[];
+  outro: string;
+  claims: Claim[];
+  estimatedSeconds: number;
+  provenance: Provenance;
+}
+
+export interface VideoOutput {
+  videoFile: string;
+  captionsFile: string;
+  durationSeconds: number;
+  width: number;
+  height: number;
+  renderedAt: string;
+  syntheticVoice: boolean;
+}
+
+export interface Video {
+  id: string;
+  channelId: string;
+  ideaIndex: number;
+  title: string;
+  format: string;
+  aspectRatio: "16:9" | "9:16";
+  targetSeconds: number;
+  status: VideoStatus;
+  statusReason: string;
+  voiceId: number;
+  script: VideoScript | null;
+  output: VideoOutput | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductionStatus {
+  ready: boolean;
+  missing: string[];
+  voices: { id: number; name: string }[];
+}
