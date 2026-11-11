@@ -231,7 +231,8 @@ func (s *Service) fail(ctx context.Context, owner, id string, cause error) {
 func permanentIfDomain(err error) error {
 	var se *StateError
 	var ve *channel.ValidationError
-	if errors.As(err, &se) || errors.As(err, &ve) || errors.Is(err, ErrNotFound) || errors.Is(err, channel.ErrNotFound) || errors.Is(err, ErrToolsMissing) {
+	var ue *UnspeakableError
+	if errors.As(err, &ue) || errors.As(err, &se) || errors.As(err, &ve) || errors.Is(err, ErrNotFound) || errors.Is(err, channel.ErrNotFound) || errors.Is(err, ErrToolsMissing) {
 		return jobs.Permanent(err)
 	}
 	return err
@@ -325,11 +326,34 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		return nil, fmt.Errorf("create video directory: %w", err)
 	}
 	narrator := Narrator{Tools: s.tools, Runner: s.runner, CacheDir: filepath.Join(s.mediaDir, "tts-cache")}
+	lex, err := LoadLexicon(filepath.Join(s.tools.ModelDir, "lexicon-en-us.txt"))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrToolsMissing, err)
+	}
+	// Normalize every segment first so all unpronounceable words are
+	// reported at once, before any audio is generated.
+	segments := v.Script.Segments()
+	spoken := make([]string, len(segments))
+	var unspeakable []string
+	seenOOV := map[string]bool{}
+	for i, seg := range segments {
+		text, oov := NormalizeForSpeech(seg.Narration, lex)
+		spoken[i] = text
+		for _, w := range oov {
+			if !seenOOV[w] {
+				seenOOV[w] = true
+				unspeakable = append(unspeakable, w)
+			}
+		}
+	}
+	if len(unspeakable) > 0 {
+		return nil, &UnspeakableError{Words: unspeakable}
+	}
 	var segs []Timed
 	var audios []string
 	total := 0.0
-	for i, seg := range v.Script.Segments() {
-		wav, err := narrator.Synthesize(ctx, v.VoiceID, seg.Narration)
+	for i, seg := range segments {
+		wav, err := narrator.Synthesize(ctx, v.VoiceID, spoken[i])
 		if err != nil {
 			return nil, fmt.Errorf("narrate segment %d: %w", i+1, err)
 		}

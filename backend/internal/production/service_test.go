@@ -172,10 +172,15 @@ func TestEditScriptCarriesClaimReviews(t *testing.T) {
 func fakeTools(t *testing.T) (Tools, *recordRunner) {
 	root := t.TempDir()
 	tools := ToolsFromRoot(root)
-	for _, p := range []string{tools.FFmpeg, tools.FFprobe, tools.TTS, filepath.Join(tools.ModelDir, "voices.bin"), filepath.Join(tools.ModelDir, "model.int8.onnx"), filepath.Join(tools.FontsDir, "Inter-Bold.ttf")} {
+	for _, p := range []string{tools.FFmpeg, tools.FFprobe, tools.TTS, filepath.Join(tools.ModelDir, "voices.bin"), filepath.Join(tools.ModelDir, "model.int8.onnx"), filepath.Join(tools.ModelDir, "lexicon-en-us.txt"), filepath.Join(tools.FontsDir, "Inter-Bold.ttf")} {
 		_ = os.MkdirAll(filepath.Dir(p), 0o755)
 		_ = os.WriteFile(p, []byte("x"), 0o644)
 	}
+	var words []string
+	for _, w := range strings.Fields(strings.ToLower("the moon is leaving us every year moves a little farther away tides transfer energy from earth spin to orbit subscribe for more")) {
+		words = append(words, w+" || x")
+	}
+	_ = os.WriteFile(filepath.Join(tools.ModelDir, "lexicon-en-us.txt"), []byte(strings.Join(words, "\n")), 0o644)
 	r := &recordRunner{}
 	r.write = func(args []string) {
 		for _, a := range args {
@@ -246,6 +251,29 @@ func TestProduceRequiresApprovalAndRenders(t *testing.T) {
 	}
 	if _, err := svc.MediaPath(ctx, "bob", v.ID, "video.mp4"); !errors.Is(err, ErrNotFound) {
 		t.Fatal("media must be owner-scoped")
+	}
+}
+
+func TestProduceStopsOnUnspeakableWords(t *testing.T) {
+	tools, runner := fakeTools(t)
+	_ = os.WriteFile(filepath.Join(tools.ModelDir, "lexicon-en-us.txt"), []byte("hello || x\n"), 0o644)
+	svc, store := newTestService(t, &scriptedGen{}, runner, tools)
+	ctx := context.Background()
+	v, _ := svc.CreateFromIdea(ctx, "alice", "ch1", 0)
+	sv := store.items[v.ID]
+	sv.Status = StatusApproved
+	sv.Script = &Script{Sections: []Section{{Narration: "hello Zorblax"}}}
+	store.items[v.ID] = sv
+	_, err := svc.Handlers()[KindProduce](ctx, jobFor(v.ID, 1))
+	var ue *UnspeakableError
+	if !errors.As(err, &ue) || !jobs.IsPermanent(err) || ue.Words[0] != "Zorblax" {
+		t.Fatalf("expected permanent unspeakable error, got %v", err)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatal("no audio may be generated when words are unpronounceable")
+	}
+	if got, _ := svc.Get(ctx, "alice", v.ID); got.Status != StatusFailed || !strings.Contains(got.StatusReason, "Zorblax") {
+		t.Fatalf("video must name the word: %+v", got)
 	}
 }
 
