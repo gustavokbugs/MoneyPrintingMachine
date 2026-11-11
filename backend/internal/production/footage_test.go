@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -259,5 +261,25 @@ func TestPlanFootageSurvivesFailedDownloads(t *testing.T) {
 	f.failDownload[2] = errors.New("HTTP 500")
 	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"mold"}}, "", 1080, 1920, t.TempDir()); err == nil {
 		t.Fatal("expected an error when no clip downloads")
+	}
+}
+
+func TestPlanFootageSkipsBlockedClips(t *testing.T) {
+	f := &fakeFootage{results: map[string][]stock.Clip{"mold": {
+		{Provider: stock.ProviderCommons, ID: 1, Duration: 10}, {Provider: stock.ProviderCommons, ID: 2, Duration: 10}}}}
+	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
+	svc.WithFootage(f)
+	list := "# misread symbols\nCOMMONS:1  # cake mold\n\n"
+	if err := os.WriteFile(filepath.Join(svc.mediaDir, BlocklistFile), []byte(list), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"mold"}}, "", 1080, 1920, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range shots {
+		if s.Clip.ID == 1 {
+			t.Fatalf("blocked clip used: %+v", shots)
+		}
 	}
 }

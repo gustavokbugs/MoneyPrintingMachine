@@ -151,14 +151,21 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 		orientation = "portrait"
 	}
 	used := map[string]bool{}
+	blocked := readBlocklist(filepath.Join(s.mediaDir, BlocklistFile))
 	searched := map[string][]stock.Clip{}
 	search := func(q string) ([]stock.Clip, error) {
 		if c, ok := searched[q]; ok {
 			return c, nil
 		}
-		c, err := s.footage.Search(ctx, q, orientation, width, height, 15)
+		found, err := s.footage.Search(ctx, q, orientation, width, height, 15)
 		if err != nil {
 			return nil, err
+		}
+		var c []stock.Clip
+		for _, clip := range found {
+			if !blocked[clipKey(clip)] {
+				c = append(c, clip)
+			}
 		}
 		searched[q] = c
 		return c, nil
@@ -298,6 +305,29 @@ func pickClip(pool []stock.Clip, used map[string]bool, length float64) (stock.Cl
 		}
 	}
 	return stock.Clip{}, false
+}
+
+// BlocklistFile, in the media directory, lists clips never to use again,
+// one "provider:id" per line (for example "commons:30164544"); "#" starts
+// a comment. Use it for images that are off-topic or could be misread.
+const BlocklistFile = "stock-blocklist.txt"
+
+// readBlocklist returns the blocked clip keys; a missing file blocks none.
+func readBlocklist(path string) map[string]bool {
+	out := map[string]bool{}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return out
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if i := strings.IndexByte(line, '#'); i >= 0 {
+			line = line[:i]
+		}
+		if line = strings.ToLower(strings.TrimSpace(line)); line != "" {
+			out[line] = true
+		}
+	}
+	return out
 }
 
 // clipKey identifies a clip across providers.
