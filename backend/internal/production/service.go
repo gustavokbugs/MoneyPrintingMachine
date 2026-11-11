@@ -333,10 +333,23 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create video directory: %w", err)
 	}
-	narrator := Narrator{Tools: s.tools, Runner: s.runner, CacheDir: filepath.Join(s.mediaDir, "tts-cache")}
-	lex, err := LoadLexicon(s.tools.LexiconPath())
+	tools, err := s.speechTools()
+	if err != nil {
+		return nil, err
+	}
+	narrator := Narrator{Tools: tools, Runner: s.runner, CacheDir: filepath.Join(s.mediaDir, "tts-cache")}
+	lex, err := LoadLexicon(tools.LexiconPath())
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrToolsMissing, err)
+	}
+	if tools.ExtraLexicon != "" {
+		extra, err := LoadLexicon(tools.ExtraLexicon)
+		if err != nil {
+			return nil, err
+		}
+		for w := range extra {
+			lex[w] = true
+		}
 	}
 	// Normalize every segment first so all unpronounceable words are
 	// reported at once, before any audio is generated.
@@ -442,6 +455,24 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		Width: width, Height: height, RenderedAt: s.now().UTC(), SyntheticVoice: true,
 		Visuals: visuals, VisualsNote: note,
 	}, nil
+}
+
+// speechTools returns the tools with the supplement lexicon attached,
+// building it once when the v0.19 fallback lexicon is installed.
+func (s *Service) speechTools() (Tools, error) {
+	tools := s.tools
+	fb := tools.FallbackLexicon()
+	if fb == "" {
+		return tools, nil
+	}
+	sup := filepath.Join(s.mediaDir, "tts-cache", "lexicon-supplement-"+filepath.Base(tools.ModelDir)+".txt")
+	if _, err := os.Stat(sup); err != nil {
+		if _, err := BuildSupplementLexicon(tools.LexiconPath(), fb, filepath.Join(tools.ModelDir, "tokens.txt"), sup); err != nil {
+			return tools, fmt.Errorf("build supplement lexicon: %w", err)
+		}
+	}
+	tools.ExtraLexicon = sup
+	return tools, nil
 }
 
 // renderScenes writes a HyperFrames project and renders it to visual.mp4

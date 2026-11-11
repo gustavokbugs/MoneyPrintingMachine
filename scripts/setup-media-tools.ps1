@@ -88,6 +88,16 @@ if (-not (Test-Path (Join-Path $modelDir 'voices.bin'))) {
   & $tar -xjf $arc -C $models
 }
 
+# --- Fallback English lexicon ----------------------------------------------
+# The v1.0 lexicon lacks some common words; the backend converts the missing
+# ones from this larger lexicon into a supplement (internal/production/lexicon.go).
+$lexicon = Join-Path $modelDir 'lexicon-en-us.txt'
+if (-not (Test-Path $lexicon)) {
+  $lex = Get-Verified 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/lexicon-en-us.txt' 'lexicon-en-us.txt' `
+    '8b67ae549a465eee78f92ecb74644ad90c3c58ce65f19c68baf85878a10ef73a'
+  Copy-Item $lex $lexicon -Force
+}
+
 # --- Inter font -----------------------------------------------------------
 $fontDir = Join-Path $local 'fonts'
 if (-not (Test-Path (Join-Path $fontDir 'Inter-Bold.ttf'))) {

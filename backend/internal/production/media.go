@@ -26,7 +26,9 @@ type Tools struct {
 	FFprobe  string
 	TTS      string // sherpa-onnx-offline-tts executable
 	ModelDir string // Kokoro model directory
-	FontsDir string // directory with Inter TTF files
+	// ExtraLexicon is a generated supplement lexicon (see lexicon.go).
+	ExtraLexicon string
+	FontsDir     string // directory with Inter TTF files
 
 	// Animated scenes (optional): Node runs the HyperFrames CLI from the
 	// renderer workspace; GSAP and web fonts are vendored there.
@@ -102,6 +104,28 @@ func (t Tools) LexiconPath() string {
 		return v1
 	}
 	return filepath.Join(t.ModelDir, "lexicon-en-us.txt")
+}
+
+// FallbackLexicon returns the v0.19 lexicon used to supplement the v1.0
+// one, or "" when the model has no v1.0 lexicon or no fallback is installed.
+func (t Tools) FallbackLexicon() string {
+	if filepath.Base(t.LexiconPath()) != "lexicon-us-en.txt" {
+		return ""
+	}
+	p := filepath.Join(t.ModelDir, "lexicon-en-us.txt")
+	if _, err := os.Stat(p); err != nil {
+		return ""
+	}
+	return p
+}
+
+// LexiconArg is the --kokoro-lexicon value: the model lexicon plus the
+// optional supplement.
+func (t Tools) LexiconArg() string {
+	if t.ExtraLexicon != "" {
+		return t.LexiconPath() + "," + t.ExtraLexicon
+	}
+	return t.LexiconPath()
 }
 
 // DefaultVoice is Heart, the highest-rated Kokoro v1.0 English voice.
@@ -208,7 +232,7 @@ func TTSArgs(tools Tools, model string, voice int, text, out string) []string {
 		"--kokoro-model=" + filepath.Join(tools.ModelDir, model),
 		"--kokoro-voices=" + filepath.Join(tools.ModelDir, "voices.bin"),
 		"--kokoro-tokens=" + filepath.Join(tools.ModelDir, "tokens.txt"),
-		"--kokoro-lexicon=" + tools.LexiconPath(),
+		"--kokoro-lexicon=" + tools.LexiconArg(),
 		"--num-threads=4",
 		"--sid=" + strconv.Itoa(voice),
 		"--output-filename=" + out,
