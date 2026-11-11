@@ -165,6 +165,36 @@ func BuildASS(segs []Timed, width, height int, st Style) string {
 	return b.String()
 }
 
+// BuildWordASS shows captions one word (or short pair) at a time in the
+// middle of the frame, popping in, with key words highlighted.
+func BuildWordASS(chunks []CaptionChunk, width, height int) string {
+	unit := float64(min(width, height)) / 100
+	var b strings.Builder
+	fmt.Fprintf(&b, "[Script Info]\nScriptType: v4.00+\nPlayResX: %d\nPlayResY: %d\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n", width, height)
+	b.WriteString("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+	fmt.Fprintf(&b, "Style: Word,Inter,%d,&H00FFFFFF,&H00FFFFFF,&H00000000,&H99000000,-1,0,0,0,100,100,0,0,1,%d,%d,5,%d,%d,0,1\n\n",
+		int(unit*12.5), max(int(unit*1.3), 3), max(int(unit*0.6), 1), int(unit*5), int(unit*5))
+	b.WriteString("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+	for _, c := range chunks {
+		words := make([]string, 0, len(c.Words))
+		for _, w := range c.Words {
+			words = append(words, w.Text)
+		}
+		text := assEscape(strings.Join(words, " "))
+		if text == "" {
+			continue
+		}
+		color := ""
+		if c.Hot {
+			color = `\c&H004DE1FF&` // #FFE14D in ASS BGR order
+		}
+		size := int(unit * captionFontUnits(c))
+		fmt.Fprintf(&b, "Dialogue: 0,%s,%s,Word,,0,0,0,,{\\pos(%d,%d)\\fs%d%s\\fscx55\\fscy55\\t(0,140,\\fscx100\\fscy100)}%s\n",
+			assTime(c.Start), assTime(c.End), width/2, height*48/100, size, color, text)
+	}
+	return b.String()
+}
+
 // BuildSRT returns plain captions for upload to platforms.
 func BuildSRT(segs []Timed) string {
 	var b strings.Builder

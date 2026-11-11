@@ -14,6 +14,7 @@ import (
 	"contentfactory/internal/channel"
 	"contentfactory/internal/jobs"
 	"contentfactory/internal/llm"
+	"contentfactory/internal/stock"
 )
 
 // Job kinds.
@@ -51,6 +52,7 @@ type Service struct {
 	runner   Runner
 	mediaDir string
 	now      func() time.Time
+	footage  FootageSource
 }
 
 // NewService builds a Service. mediaDir holds rendered files and the TTS cache.
@@ -433,7 +435,18 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	visual, visuals, note := "", "solid", ""
 	resolved := ResolveStyle(v.VisualStyle, ch.Niche)
 	scenes := PlanScenes(segs, kickers, ch.Name)
-	if s.tools.AnimatedScenes() {
+	var credits []stock.Clip
+	if resolved == StyleFootage {
+		visual, credits, err = s.renderFootage(rctx, dir, segs, ch.Niche, width, height)
+		if err != nil {
+			// Fall back to animated scenes so the video still renders.
+			visual, credits, note = "", nil, "Stock footage was not available, so animated scenes were used: "+truncateErr(err, 300)
+			resolved = StyleMinimal
+		} else {
+			visuals = "footage:pexels"
+		}
+	}
+	if resolved != StyleFootage && s.tools.AnimatedScenes() {
 		visual, err = s.renderScenes(rctx, dir, ProjectInput{
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
 			ChannelName: ch.Name, Scenes: scenes, Captions: captionsFor(resolved, segs, width, height), Seed: seedOf(v.ID),
@@ -443,13 +456,20 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		} else {
 			visuals = "animated:" + resolved
 		}
-	} else {
-		note = "Animated scenes are not installed (run npm install in renderer/)."
+	} else if resolved != StyleFootage {
+		note = strings.TrimSpace(note + " Animated scenes are not installed (run npm install in renderer/).")
 	}
 	// Animated scenes carry their own titles and word-by-word captions; the
 	// plain fallback burns in titles and captions with ASS subtitles.
 	assFile := ""
-	if visual == "" {
+	switch {
+	case resolved == StyleFootage:
+		// Stock footage has no text of its own: one word at a time on top.
+		assFile = "captions.ass"
+		if err := os.WriteFile(filepath.Join(dir, assFile), []byte(BuildWordASS(WordCaptions(segs), width, height)), 0o644); err != nil {
+			return nil, fmt.Errorf("write subtitles: %w", err)
+		}
+	case visual == "":
 		assFile = "captions.ass"
 		if err := os.WriteFile(filepath.Join(dir, assFile), []byte(BuildASS(segs, width, height, style)), 0o644); err != nil {
 			return nil, fmt.Errorf("write subtitles: %w", err)
@@ -486,7 +506,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		Width: width, Height: height, RenderedAt: s.now().UTC(), SyntheticVoice: true,
 		Visuals: visuals, VisualsNote: note,
 		Music:        "Original score generated in code (" + mood.Description + "); no third-party audio.",
-		SoundEffects: len(effects), CaptionTiming: timing,
+		SoundEffects: len(effects), CaptionTiming: timing, Footage: credits,
 	}, nil
 }
 

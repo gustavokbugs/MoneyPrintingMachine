@@ -27,6 +27,7 @@ type Config struct {
 
 	// YouTube Data API key for public data (trends, handle checks).
 	YouTubeAPIKey     string
+	PexelsAPIKey      string
 	YouTubeDailyQuota int
 	// Google OAuth client for channel connections.
 	GoogleClientID     string
@@ -54,6 +55,7 @@ func Load(envFile string) (Config, error) {
 		WebBaseURL:   getenv("WEB_BASE_URL", "http://127.0.0.1:5173"),
 
 		YouTubeAPIKey:      strings.TrimSpace(os.Getenv("YOUTUBE_API_KEY")),
+		PexelsAPIKey:       strings.TrimSpace(os.Getenv("PEXELS_API_KEY")),
 		GoogleClientID:     strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID")),
 		GoogleClientSecret: strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET")),
 		TokenEncryptionKey: strings.TrimSpace(os.Getenv("TOKEN_ENCRYPTION_KEY")),

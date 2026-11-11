@@ -28,6 +28,7 @@ import (
 	"contentfactory/internal/publishing"
 	"contentfactory/internal/refresh"
 	"contentfactory/internal/rss"
+	"contentfactory/internal/stock"
 	"contentfactory/internal/trends"
 	"contentfactory/internal/youtube"
 )
@@ -99,7 +100,8 @@ func run(log *slog.Logger) error {
 	// the verified FFmpeg from .local.
 	configureRendererEnv(localDir)
 	videos := production.NewService(postgres.NewVideoRepository(pool), channels, model,
-		production.ToolsFromRoot(localDir).WithRenderer(filepath.Join("..", "renderer")), production.ExecRunner{}, filepath.Join(localDir, "media"))
+		production.ToolsFromRoot(localDir).WithRenderer(filepath.Join("..", "renderer")), production.ExecRunner{}, filepath.Join(localDir, "media")).
+		WithFootage(stock.NewClient(cfg.PexelsAPIKey, 2*time.Minute))
 	for k, h := range videos.Handlers() {
 		handlers[k] = h
 	}
