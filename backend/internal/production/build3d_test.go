@@ -45,7 +45,7 @@ func TestSceneScriptRewritesTheReference(t *testing.T) {
 	}
 	lines := make([]string, len(ref.Lines))
 	for i := range lines {
-		lines[i] = fmt.Sprintf(`{"narration":"Fresh take number %d on this stage of the build.","onScreenText":"Step %d"}`, i+1, i+1)
+		lines[i] = fmt.Sprintf(`{"narration":"Fresh take number %d on this stage of the build, told in new words that run about as long as the original line did.","onScreenText":"Step %d"}`, i+1, i+1)
 	}
 	good := `{"hook":"A new hook.","outro":"Bye now.","lines":[` + strings.Join(lines, ",") + `]}`
 	svc, _ := newTestService(t, &scriptedGen{responses: []string{good}}, nil, Tools{})
@@ -54,7 +54,7 @@ func TestSceneScriptRewritesTheReference(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Hook != "A new hook." || got.Sections[3].Narration != "Fresh take number 4 on this stage of the build." || got.Sections[3].OnScreenText != "Step 4" {
+	if got.Hook != "A new hook." || !strings.HasPrefix(got.Sections[3].Narration, "Fresh take number 4 on this stage") || got.Sections[3].OnScreenText != "Step 4" {
 		t.Errorf("rewrite not used: %+v", got)
 	}
 	if len(got.Claims) != len(ref.Claims) || got.Claims[0].Status != ClaimUnverified {
@@ -132,5 +132,23 @@ func TestStageMarksFollowTheScene(t *testing.T) {
 	}
 	if got[3].Keyword != "fix" || got[3].Problem != "" {
 		t.Errorf("stage 3 is a fix: %+v", got[3])
+	}
+}
+
+func TestRewriteMustKeepTheLength(t *testing.T) {
+	ref := Scenes3D[0].Reference
+	var out rewriteOutput
+	out.Hook = "Hook."
+	for range ref.Lines {
+		out.Lines = append(out.Lines, struct {
+			Narration string `json:"narration"`
+			OnScreen  string `json:"onScreenText"`
+		}{Narration: "A short line here.", OnScreen: "x"})
+	}
+	for i := range out.Lines {
+		out.Lines[i].Narration += strings.Repeat(" word", i) // keep lines distinct
+	}
+	if rewriteUsable(out, ref) {
+		t.Error("a rewrite far shorter than the reference must be rejected")
 	}
 }

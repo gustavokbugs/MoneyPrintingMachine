@@ -15,7 +15,7 @@ const (
 )
 
 // ShortFormatSeconds is the default length of the short viral formats.
-const ShortFormatSeconds = 60
+const ShortFormatSeconds = 65 // aim for the middle of 60-70 s
 
 // StoryFormat describes one format for the UI and the script prompt.
 type StoryFormat struct {

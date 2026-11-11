@@ -26,18 +26,18 @@ type SceneLine struct{ Narration, OnScreen string }
 
 // damScript is the reference for the dam scene.
 var damScript = SceneScript{
-	Hook: "You live by a river, and you want power for your house. Let's build it from scratch.",
+	Hook: "Your house is dark every night, but you live next to a river. Let's build power.",
 	Lines: []SceneLine{
-		{"First, you drop big stones across the river to block it. Done? Not quite.", "Stones"},
-		{"The water squeezes right through the gaps between the stones.", "Gaps"},
-		{"So you pack the gaps with clay. Sticky, heavy, watertight. The leaks stop.", "Clay"},
-		{"Now the water piles up behind your wall. Congrats, you made a lake.", "A lake"},
-		{"But the lake keeps filling, and the water starts pouring over the top.", "Overflow"},
-		{"It digs at the wall from both sides, and the whole thing washes away.", "Gone"},
-		{"So you build a real dam out of cut stone, thick at the bottom, where the water pushes hardest.", "A real dam"},
-		{"Then you add a spillway, a side channel that lets extra water out before it reaches the top.", "Spillway"},
-		{"That falling water is wasted, so you put a water wheel under it, and it spins.", "Water wheel"},
-		{"Hook the wheel to a generator, run wires to your house, and the lights come on.", "Power"},
+		{"First, you roll big stones into the river, bank to bank. A wall! Done? Not even close.", "Stones"},
+		{"The water just squeezes through the gaps between the stones, like they aren't even there.", "Gaps"},
+		{"So you dig up clay and pack it into every gap. Sticky, heavy, and watertight. The leaks stop.", "Clay"},
+		{"Now the water has nowhere to go, so it piles up behind your wall. Congrats, you just made a lake.", "A lake"},
+		{"But the lake keeps filling, and filling, until the water starts pouring right over the top.", "Overflow"},
+		{"The falling water digs at the base of the wall, and the whole thing washes away downstream.", "Gone"},
+		{"So you build a real dam out of cut stone, thick at the bottom, because deep water pushes the hardest down there.", "A real dam"},
+		{"Then you add a spillway, a side channel that lets extra water out before the lake can reach the top.", "Spillway"},
+		{"All that falling water is wasted, so you put a water wheel under it, and it spins.", "Water wheel"},
+		{"Hook the wheel to a generator, run wires to your house, and the lights finally come on.", "Power"},
 	},
 	Outro: "Congrats. You just built a hydroelectric dam. Follow for more.",
 	Claims: []Claim{
@@ -63,6 +63,8 @@ func (r SceneScript) Script() Script {
 const rewriteSystemPrompt = `You rewrite narration for a short 3D animation where each line plays over one stage of the animation.
 Rules:
 - Rewrite EVERY line in fresh words, in the same order, with the same meaning and the same facts. One output line per input line, never merge, skip, or add lines.
+- Keep each line about as long as its reference line (the video must last about a minute).
+- Do not reuse the reference wording: change the sentences, not just a word or two.
 - Keep it punchy and spoken to "you": short sentences, everyday words, a little humor.
 - Keep the "But..." lines as problems and the "So you..." lines as fixes.
 - Never add numbers, dates, names, or facts that are not in the reference.
@@ -100,7 +102,10 @@ func rewriteUsable(out rewriteOutput, ref SceneScript) bool {
 		return false
 	}
 	seen := map[string]bool{}
+	total, refTotal := 0, 0
 	for i, l := range out.Lines {
+		total += len(strings.Fields(l.Narration))
+		refTotal += len(strings.Fields(ref.Lines[i].Narration))
 		n := strings.ToLower(strings.Join(strings.Fields(l.Narration), " "))
 		words := len(strings.Fields(n))
 		refWords := len(strings.Fields(ref.Lines[i].Narration))
@@ -109,7 +114,8 @@ func rewriteUsable(out rewriteOutput, ref SceneScript) bool {
 		}
 		seen[n] = true
 	}
-	return true
+	// A rewrite much shorter than the reference would cut the video short.
+	return total*100 >= refTotal*85
 }
 
 // generateSceneScript writes a 3D build script as a fresh rewrite of the

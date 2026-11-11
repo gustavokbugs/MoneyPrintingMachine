@@ -13,8 +13,10 @@ import (
 	"contentfactory/internal/llm"
 )
 
-// WordsPerSecond is the narration pace used to size scripts (150 wpm).
-const WordsPerSecond = 2.5
+// WordsPerSecond is the narration pace used to size scripts: the Kokoro
+// voice's measured rate including the pauses between segments (about
+// 170 words per minute).
+const WordsPerSecond = 2.8
 
 type scriptOutput struct {
 	Hook     string `json:"hook"`
@@ -87,6 +89,8 @@ func (s *Service) GenerateScript(ctx context.Context, ch *channel.Channel, v *Vi
 	}
 	idea := ch.Blueprint.Ideas[v.IdeaIndex]
 	words := int(float64(v.TargetSeconds) * WordsPerSecond * paceOf(v.StoryFormat))
+	// Ask for a little more than the target: models usually fall short.
+	words = words * 105 / 100
 	sections := min(max(v.TargetSeconds/45, 2), 10)
 	mode, dialogue := dialogueMode(v.DialogueMode)
 	dialogue = dialogue && IsDialogue(mode.ID)
@@ -139,6 +143,7 @@ Write in %s.`, ch.Name, audience, identity, idea.WorkingTitle, idea.Topic, idea.
 		strings.Join(idea.ResearchSources, "; "), idea.Format, words, sections, shape, voices, lang)
 
 	var lastErr error
+	var best *Script
 	for range 3 {
 		var out scriptOutput
 		err := s.writer().GenerateJSON(ctx, llm.Request{
@@ -151,6 +156,9 @@ Write in %s.`, ch.Name, audience, identity, idea.WorkingTitle, idea.Topic, idea.
 			if errors.Is(err, llm.ErrInvalidOutput) {
 				lastErr = err
 				continue
+			}
+			if best != nil {
+				return best, nil // a short script beats none
 			}
 			return nil, err
 		}
@@ -167,8 +175,20 @@ Write in %s.`, ch.Name, audience, identity, idea.WorkingTitle, idea.Topic, idea.
 			lastErr = fmt.Errorf("%w: the script copied the format example", llm.ErrInvalidOutput)
 			continue
 		}
-		sc.EstimatedSeconds = int(float64(sc.WordCount()) / WordsPerSecond)
+		sc.EstimatedSeconds = int(float64(sc.WordCount()) / WordsPerSecond / paceOf(v.StoryFormat))
+		// Models often write short. Retry a script that falls well below
+		// the target length, but keep the longest one in case all do.
+		if sc.WordCount() < words*85/100 {
+			if best == nil || sc.WordCount() > best.WordCount() {
+				best = sc
+			}
+			lastErr = fmt.Errorf("%w: the script has %d words, the target is %d", llm.ErrInvalidOutput, sc.WordCount(), words)
+			continue
+		}
 		return sc, nil
+	}
+	if best != nil {
+		return best, nil
 	}
 	return nil, lastErr
 }

@@ -126,8 +126,11 @@ func TestCreateFromIdeaAndScriptJob(t *testing.T) {
 	if got.Status != StatusScriptReady || got.Script == nil || len(got.Script.Claims) != 1 || got.Script.Provenance.Model != "test-model" {
 		t.Fatalf("script not stored correctly: %+v", got)
 	}
-	if gen.calls != 2 {
-		t.Fatalf("invalid output must be re-sampled, calls=%d", gen.calls)
+	// Call 1 is invalid and re-sampled; call 2 is valid but far shorter
+	// than the target, so it is retried once more (call 3, no answer) and
+	// then kept as the best script.
+	if gen.calls != 3 {
+		t.Fatalf("calls=%d, want 3", gen.calls)
 	}
 }
 
