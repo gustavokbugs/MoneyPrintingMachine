@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -37,8 +38,10 @@ type Tools struct {
 	// renderer workspace; GSAP and web fonts are vendored there.
 	Node        string
 	HyperFrames string
-	GSAP        string
-	WebFonts    string
+	// TTSBridge narrates non-English text (renderer/tts.mjs).
+	TTSBridge string
+	GSAP      string
+	WebFonts  string
 }
 
 // WithRenderer adds the HyperFrames workspace at dir (the repository's
@@ -55,6 +58,9 @@ func (t Tools) WithRenderer(dir string) Tools {
 	t.HyperFrames = filepath.Join(dir, "node_modules", "hyperframes", "bin", "hyperframes.mjs")
 	t.GSAP = filepath.Join(dir, "node_modules", "gsap", "dist", "gsap.min.js")
 	t.WebFonts = filepath.Join(dir, "node_modules", "@fontsource")
+	if _, err := os.Stat(filepath.Join(dir, "node_modules", "sherpa-onnx-node")); err == nil {
+		t.TTSBridge = filepath.Join(dir, "tts.mjs")
+	}
 	return t
 }
 
@@ -141,12 +147,15 @@ const DefaultVoice = 3
 var Voices = []struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
+	Lang string `json:"lang"`
 }{
-	{3, "Heart (American female)"}, {2, "Bella (American female)"}, {6, "Nicole (American female, soft)"},
-	{9, "Sarah (American female)"}, {7, "Nova (American female)"}, {16, "Michael (American male)"},
-	{14, "Fenrir (American male)"}, {18, "Puck (American male)"}, {11, "Adam (American male)"},
-	{21, "Emma (British female)"}, {22, "Isabella (British female)"}, {26, "George (British male)"},
-	{25, "Fable (British male)"}, {24, "Daniel (British male)"},
+	{3, "Heart (American female)", "en"}, {2, "Bella (American female)", "en"}, {6, "Nicole (American female, soft)", "en"},
+	{9, "Sarah (American female)", "en"}, {7, "Nova (American female)", "en"}, {16, "Michael (American male)", "en"},
+	{14, "Fenrir (American male)", "en"}, {18, "Puck (American male)", "en"}, {11, "Adam (American male)", "en"},
+	{21, "Emma (British female)", "en"}, {22, "Isabella (British female)", "en"}, {26, "George (British male)", "en"},
+	{25, "Fable (British male)", "en"}, {24, "Daniel (British male)", "en"},
+	{42, "Dora (Brazilian Portuguese female)", "pt-br"}, {43, "Alex (Brazilian Portuguese male)", "pt-br"},
+	{44, "Santa (Brazilian Portuguese male)", "pt-br"},
 }
 
 // ValidVoice reports whether id is an offered speaker.
@@ -257,6 +266,9 @@ type Narrator struct {
 	CacheDir string
 	// Pace is the speaking rate (1.2 is 20% faster); 0 means normal.
 	Pace float64
+	// Lang is the espeak-ng language for non-English narration ("" is
+	// English); such text goes through the Node bridge (renderer/tts.mjs).
+	Lang string
 }
 
 // CacheKey identifies an utterance by model, voice, and text.
@@ -284,6 +296,9 @@ func (n Narrator) Synthesize(ctx context.Context, voice int, text string) (strin
 	if n.Pace > 0 && n.Pace != 1 {
 		key += "@" + strconv.FormatFloat(n.Pace, 'f', 3, 64) // a new pace is new audio
 	}
+	if n.Lang != "" {
+		key += "#" + n.Lang
+	}
 	out := filepath.Join(n.CacheDir, CacheKey(key, voice, text)+".wav")
 	if st, err := os.Stat(out); err == nil && st.Size() > 44 {
 		return out, nil
@@ -291,7 +306,12 @@ func (n Narrator) Synthesize(ctx context.Context, voice int, text string) (strin
 	tmp := out + ".tmp.wav"
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	if _, err := n.Runner.Run(ctx, n.CacheDir, n.Tools.TTS, TTSArgs(n.Tools, model, voice, n.Pace, text, tmp)...); err != nil {
+	if n.Lang != "" {
+		err = n.synthesizeBridge(ctx, model, voice, text, tmp)
+	} else {
+		_, err = n.Runner.Run(ctx, n.CacheDir, n.Tools.TTS, TTSArgs(n.Tools, model, voice, n.Pace, text, tmp)...)
+	}
+	if err != nil {
 		_ = os.Remove(tmp)
 		return "", err
 	}
@@ -299,6 +319,34 @@ func (n Narrator) Synthesize(ctx context.Context, voice int, text string) (strin
 		return "", fmt.Errorf("store narration: %w", err)
 	}
 	return out, nil
+}
+
+// synthesizeBridge narrates non-English text with the Node bridge. The
+// request goes in a UTF-8 JSON file: Windows would pass accented text on
+// the command line in the ANSI code page and garble it.
+func (n Narrator) synthesizeBridge(ctx context.Context, model string, voice int, text, out string) error {
+	if n.Tools.Node == "" || n.Tools.TTSBridge == "" {
+		return fmt.Errorf("%w: non-English narration needs Node and renderer/tts.mjs (npm install in renderer/)", ErrToolsMissing)
+	}
+	scale := 1.0
+	if n.Pace > 0 {
+		scale = 1 / n.Pace
+	}
+	req, err := json.Marshal(map[string]any{
+		"model": filepath.Join(n.Tools.ModelDir, model), "voices": filepath.Join(n.Tools.ModelDir, "voices.bin"),
+		"tokens": filepath.Join(n.Tools.ModelDir, "tokens.txt"), "lexicon": n.Tools.LexiconPath(),
+		"lang": n.Lang, "sid": voice, "lengthScale": scale, "threads": 4, "text": text, "out": out,
+	})
+	if err != nil {
+		return err
+	}
+	reqFile := out + ".json"
+	if err := os.WriteFile(reqFile, req, 0o644); err != nil {
+		return fmt.Errorf("write tts request: %w", err)
+	}
+	defer os.Remove(reqFile)
+	_, err = n.Runner.Run(ctx, n.CacheDir, n.Tools.Node, n.Tools.TTSBridge, reqFile)
+	return err
 }
 
 // ProbeDuration returns a media file's duration in seconds.

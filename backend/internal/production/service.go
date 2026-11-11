@@ -88,10 +88,11 @@ func (s *Service) CreateFromIdea(ctx context.Context, ownerID, channelID string,
 		}
 	}
 	target := min(max(idea.SuggestedDurationSecs, 15), 3600)
+	voiceA, voiceB := defaultVoices(ch.Language)
 	v := &Video{
 		OwnerID: ownerID, ChannelID: ch.ID, IdeaIndex: ideaIndex, Title: idea.WorkingTitle, Format: idea.Format,
-		AspectRatio: aspect, TargetSeconds: target, Status: StatusPlanned, VoiceID: DefaultVoice, VisualStyle: StyleAuto,
-		DialogueMode: DialogueNarration, VoiceB: DefaultVoiceB, StoryFormat: FormatExplainer,
+		AspectRatio: aspect, TargetSeconds: target, Status: StatusPlanned, VoiceID: voiceA, VisualStyle: StyleAuto,
+		DialogueMode: DialogueNarration, VoiceB: voiceB, StoryFormat: FormatExplainer,
 	}
 	if err := s.store.Create(ctx, v); err != nil {
 		return nil, err
@@ -341,7 +342,11 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	if err != nil {
 		return nil, err
 	}
-	narrator := Narrator{Tools: tools, Runner: s.runner, CacheDir: filepath.Join(s.mediaDir, "tts-cache"), Pace: paceOf(v.StoryFormat)}
+	lang, ok := speechLang(ch.Language)
+	if !ok {
+		return nil, &UnsupportedLanguageError{Language: ch.Language}
+	}
+	narrator := Narrator{Tools: tools, Runner: s.runner, CacheDir: filepath.Join(s.mediaDir, "tts-cache"), Pace: paceOf(v.StoryFormat), Lang: lang}
 	lex, err := LoadLexicon(tools.LexiconPath())
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrToolsMissing, err)
@@ -362,6 +367,12 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	var unspeakable []string
 	seenOOV := map[string]bool{}
 	for i, seg := range segments {
+		if lang != "" {
+			// espeak-ng reads numbers and symbols in its own language; the
+			// English lexicon check does not apply.
+			spoken[i] = cleanForSpeech(seg.Narration)
+			continue
+		}
 		text, oov := NormalizeForSpeech(seg.Narration, lex)
 		spoken[i] = text
 		for _, w := range oov {
@@ -376,7 +387,9 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	}
 	aligner := Aligner{Exe: s.tools.ASR, ModelDir: s.tools.ASRModel, Runner: s.runner}
 	timing := "estimated"
-	if aligner.Available() {
+	if aligner.Available() && lang == "" {
+		// The alignment model is English-only; other languages keep
+		// estimated word times.
 		timing = "measured"
 	}
 	var segs []Timed
@@ -479,7 +492,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		visual, err = s.renderScenes(rctx, dir, ProjectInput{
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
 			ChannelName: ch.Name, Scenes: scenes, Captions: captions, Seed: seedOf(v.ID),
-			Pops: pops, HookText: hookText(segs), Background: background,
+			Pops: pops, HookText: hookText(segs), Background: background, FollowText: followText(ch.Language, ch.Name),
 		})
 		if err != nil {
 			visual, note = "", "Animated scenes failed, so a plain background was used: "+truncateErr(err, 300)

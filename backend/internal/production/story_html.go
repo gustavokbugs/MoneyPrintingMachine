@@ -71,7 +71,7 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
 {{range $i, $c := .Captions}}    <div class="cap{{if $c.Hot}} hot{{end}}{{if $c.Problem}} problem{{end}}{{if eq $c.Speaker "B"}} spk-b{{end}}" id="{{cid $i}}" style="{{capsize $c}}">{{range $c.Words}}{{.Text}} {{end}}</div>
 {{end}}  </div>
   <div class="fx clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="3">
-    <div class="end" id="end">Follow {{.ChannelName}} for more</div>
+    <div class="end" id="end">{{if .FollowText}}{{.FollowText}}{{else}}Follow {{.ChannelName}} for more{{end}}</div>
     <div class="progress"><div class="progress-fill"></div></div>
   </div>
 </div>

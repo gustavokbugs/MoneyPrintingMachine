@@ -338,6 +338,8 @@ type ProjectInput struct {
 	// Background is a prepared clip (already cropped and trimmed) to play
 	// behind the gameplay story instead of the drawn game.
 	Background string
+	// FollowText is the closing call to action, in the channel's language.
+	FollowText string
 }
 
 type projectView struct {

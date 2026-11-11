@@ -51,9 +51,9 @@ func scanVideo(row pgx.Row) (*production.Video, error) {
 
 // Create inserts a video.
 func (r *VideoRepository) Create(ctx context.Context, v *production.Video) error {
-	err := r.pool.QueryRow(ctx, `INSERT INTO videos (owner_id, channel_id, idea_index, title, format, aspect_ratio, target_seconds, status, voice_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id::text, version, created_at, updated_at`,
-		v.OwnerID, v.ChannelID, v.IdeaIndex, v.Title, v.Format, v.AspectRatio, v.TargetSeconds, string(v.Status), v.VoiceID).
+	err := r.pool.QueryRow(ctx, `INSERT INTO videos (owner_id, channel_id, idea_index, title, format, aspect_ratio, target_seconds, status, voice_id, voice_b)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id::text, version, created_at, updated_at`,
+		v.OwnerID, v.ChannelID, v.IdeaIndex, v.Title, v.Format, v.AspectRatio, v.TargetSeconds, string(v.Status), v.VoiceID, voiceBOrDefault(v.VoiceB)).
 		Scan(&v.ID, &v.Version, &v.CreatedAt, &v.UpdatedAt)
 	if isUniqueViolation(err) {
 		return production.ErrExists
