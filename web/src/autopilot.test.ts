@@ -19,3 +19,23 @@ describe("asAutopilotResult", () => {
     expect(() => asAutopilotResult(null)).toThrow();
   });
 });
+
+import { asDialogueModes } from "./api/guards";
+import { speakerRole } from "./components/DialogueControls";
+import type { Video } from "./api/types";
+
+describe("dialogue modes", () => {
+  it("keeps valid modes and always offers single narrator", () => {
+    const modes = asDialogueModes([{ id: "qa", name: "Q&A", speakerA: "Host", speakerB: "Expert" }, { id: 3 }]);
+    expect(modes.map((m) => m.id)).toEqual(["narration", "qa"]);
+    expect(asDialogueModes(undefined).map((m) => m.id)).toEqual(["narration"]);
+  });
+
+  it("names each speaker's role", () => {
+    const modes = asDialogueModes([{ id: "narration", name: "Single", speakerA: "Narrator", speakerB: "" }, { id: "qa", name: "Q&A", speakerA: "Host", speakerB: "Expert" }]);
+    const v = { dialogueMode: "qa" } as Video;
+    expect(speakerRole(modes, v, "B")).toBe("Expert");
+    expect(speakerRole(modes, v, undefined)).toBe("Host");
+    expect(speakerRole(modes, { dialogueMode: "narration" } as Video, "B")).toBe("");
+  });
+});

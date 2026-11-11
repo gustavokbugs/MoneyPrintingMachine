@@ -2,7 +2,7 @@ import { type VisualStyle, visualStyles } from "./types";
 // Runtime checks for API responses. Responses are untrusted until their
 // essential shape is confirmed; deeper fields are validated by the server.
 
-import type { Channel, ChannelStatus, Job, NicheReport } from "./types";
+import type { Channel, ChannelStatus, DialogueModeInfo, Job, NicheReport } from "./types";
 
 export class ResponseShapeError extends Error {
   constructor(what: string) {
@@ -112,4 +112,18 @@ export function asAutopilotResult(v: unknown): AutopilotResult {
   }
   const strings = (a: unknown) => (Array.isArray(a) ? a.filter((x): x is string => typeof x === "string") : []);
   return { channelId: v.channelId, generated: strings(v.generated), notes: strings(v.notes) };
+}
+
+/** asDialogueModes keeps well-formed modes; single narrator is always offered. */
+export function asDialogueModes(v: unknown): DialogueModeInfo[] {
+  const out: DialogueModeInfo[] = [];
+  if (Array.isArray(v)) {
+    for (const m of v) {
+      if (isRecord(m) && typeof m.id === "string" && typeof m.name === "string") {
+        out.push({ id: m.id, name: m.name, speakerA: typeof m.speakerA === "string" ? m.speakerA : "", speakerB: typeof m.speakerB === "string" ? m.speakerB : "" });
+      }
+    }
+  }
+  if (!out.some((m) => m.id === "narration")) out.unshift({ id: "narration", name: "Single narrator", speakerA: "Narrator", speakerB: "" });
+  return out;
 }

@@ -11,6 +11,7 @@ import { Badge, Button, Empty, ErrorState, JobProgress, Notice, ProvenanceNote, 
 import { useJob } from "../hooks/useJob";
 import { formatDateTime, formatDuration, t } from "../i18n";
 import { VideoStatusBadge } from "./ChannelVideos";
+import { DialogueControls, speakerRole } from "../components/DialogueControls";
 
 function useVideoJob(video: Video, start: (key: string) => ReturnType<typeof api.generateVideoScript>, doneMessage: string) {
   const qc = useQueryClient();
@@ -143,6 +144,7 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
           </Button>
         }
       >
+        <DialogueControls video={v} tools={tools} disabled={busy} onSaved={setVideo} />
         {scriptJob.jobId && <JobProgress job={scriptJob.job.data} error={scriptJob.job.error} />}
         {!sc ? (
           <Empty icon={FileText}>
@@ -158,7 +160,7 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
                 <dd>{sc.hook}</dd>
               </div>
               {sc.sections.map((s, i) => (
-                <EditableText key={`${i}-${s.heading}`} label={`${i + 1}. ${s.heading || s.onScreenText}`} value={s.narration} multiline maxLength={4000} onSave={(val) => editSection(i, val)} />
+                <EditableText key={`${i}-${s.heading}`} label={`${i + 1}. ${speakerRole(tools?.dialogueModes ?? [], v, s.speaker) ? `[${speakerRole(tools?.dialogueModes ?? [], v, s.speaker)}] ` : ""}${s.heading || s.onScreenText}`} value={s.narration} multiline maxLength={4000} onSave={(val) => editSection(i, val)} />
               ))}
               <div className="field">
                 <dt>{t("video.outro")}</dt>

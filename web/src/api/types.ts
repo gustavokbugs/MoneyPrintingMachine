@@ -335,6 +335,8 @@ export interface ScriptSection {
   heading: string;
   narration: string;
   onScreenText: string;
+  /** "A" or "B" in two-voice scripts. */
+  speaker?: string;
 }
 
 export interface Claim {
@@ -382,6 +384,8 @@ export interface Video {
   statusReason: string;
   voiceId: number;
   visualStyle: VisualStyle;
+  dialogueMode: string;
+  voiceB: number;
   script: VideoScript | null;
   output: VideoOutput | null;
   version: number;
@@ -396,6 +400,15 @@ export interface ProductionStatus {
   styles: VisualStyle[];
   animatedScenes: boolean;
   stockFootage: boolean;
+  dialogueModes: DialogueModeInfo[];
+}
+
+/** DialogueModeInfo is one script format and its speaker roles. */
+export interface DialogueModeInfo {
+  id: string;
+  name: string;
+  speakerA: string;
+  speakerB: string;
 }
 
 /** Visual styles the scene renderer supports; keep in sync with production.Styles. */

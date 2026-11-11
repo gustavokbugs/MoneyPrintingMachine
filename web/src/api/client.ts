@@ -5,6 +5,7 @@ import {
   asRecordOf,
   asVisualStyles,
   isRecord,
+  asDialogueModes,
 } from "./guards";
 import type {
   Blueprint,
@@ -198,7 +199,7 @@ export const api = {
   productionStatus: async (): Promise<ProductionStatus> => {
     const raw = await request("GET", "/api/production/status");
     const status = asRecordOf<ProductionStatus>("production status", ["ready", "missing", "voices"])(raw);
-    return { ...status, styles: asVisualStyles(isRecord(raw) ? raw.styles : undefined), animatedScenes: status.animatedScenes === true, stockFootage: status.stockFootage === true };
+    return { ...status, styles: asVisualStyles(isRecord(raw) ? raw.styles : undefined), animatedScenes: status.animatedScenes === true, stockFootage: status.stockFootage === true, dialogueModes: asDialogueModes(isRecord(raw) ? raw.dialogueModes : undefined) };
   },
   listVideos: async (channelId: string) =>
     asItems(await request("GET", `/api/channels/${encodeURIComponent(channelId)}/videos`), asRecordOf<Video>("video", ["id", "status"])),
@@ -212,6 +213,8 @@ export const api = {
   approveVideo: async (id: string) => asRecordOf<Video>("video", ["id", "status"])(await request("POST", `/api/videos/${encodeURIComponent(id)}/approve`)),
   setVoice: async (id: string, voiceId: number) =>
     asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/voice`, { voiceId })),
+  setDialogue: async (id: string, dialogueMode: string, voiceB: number) =>
+    asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/dialogue`, { dialogueMode, voiceB })),
   setVisualStyle: async (id: string, visualStyle: VisualStyle) =>
     asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/style`, { visualStyle })),
   generateVideoScript: async (id: string, key: string) => asJob(await request("POST", `/api/videos/${encodeURIComponent(id)}/script/generate`, undefined, idem(key))),
