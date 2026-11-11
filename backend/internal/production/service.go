@@ -371,6 +371,11 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	if len(unspeakable) > 0 {
 		return nil, &UnspeakableError{Words: unspeakable}
 	}
+	aligner := Aligner{Exe: s.tools.ASR, ModelDir: s.tools.ASRModel, Runner: s.runner}
+	timing := "estimated"
+	if aligner.Available() {
+		timing = "measured"
+	}
 	var segs []Timed
 	var audios []string
 	var kickers []string
@@ -388,7 +393,16 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		if title == "" {
 			title = seg.Heading
 		}
-		segs = append(segs, Timed{Audio: wav, Duration: d, Title: title, Text: seg.Narration})
+		tm := Timed{Audio: wav, Duration: d, Title: title, Text: seg.Narration}
+		if timing == "measured" {
+			// Alignment only improves captions; an error falls back to estimates.
+			if words, err := aligner.WordTimes(ctx, wav, seg.Narration, d); err == nil {
+				tm.Words = words
+			} else {
+				timing = "estimated"
+			}
+		}
+		segs = append(segs, tm)
 		kicker := ""
 		if seg.Heading != "" && seg.Heading != title {
 			kicker = seg.Heading
@@ -472,7 +486,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		Width: width, Height: height, RenderedAt: s.now().UTC(), SyntheticVoice: true,
 		Visuals: visuals, VisualsNote: note,
 		Music:        "Original score generated in code (" + mood.Description + "); no third-party audio.",
-		SoundEffects: len(effects),
+		SoundEffects: len(effects), CaptionTiming: timing,
 	}, nil
 }
 

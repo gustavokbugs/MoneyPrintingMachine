@@ -168,6 +168,9 @@ type Output struct {
 	// effects placed on the timeline.
 	Music        string `json:"music,omitempty"`
 	SoundEffects int    `json:"soundEffects,omitempty"`
+	// CaptionTiming is "measured" when word times come from the audio,
+	// "estimated" when they are proportional to word length.
+	CaptionTiming string `json:"captionTiming,omitempty"`
 }
 
 // Video is one production unit.

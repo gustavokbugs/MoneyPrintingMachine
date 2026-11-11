@@ -14,6 +14,30 @@ type Timed struct {
 	Duration float64
 	Title    string
 	Text     string
+	// Words holds the start time of each word of Text (split on spaces),
+	// relative to the segment, when it was measured from the audio.
+	Words []float64
+}
+
+// wordStarts returns the start of each word of s.Text within the segment:
+// the measured times when present, else an estimate proportional to word
+// length.
+func wordStarts(s Timed) []float64 {
+	words := strings.Fields(s.Text)
+	if len(s.Words) == len(words) {
+		return s.Words
+	}
+	total := 0
+	for _, w := range words {
+		total += len([]rune(w)) + 1
+	}
+	out := make([]float64, len(words))
+	t := 0.0
+	for i, w := range words {
+		out[i] = t
+		t += s.Duration * float64(len([]rune(w))+1) / float64(max(total, 1))
+	}
+	return out
 }
 
 // Style holds brand values used on screen.
@@ -50,22 +74,33 @@ type Cue struct {
 	Text       string
 }
 
-// Cues distributes each segment's caption chunks over the segment's
-// duration in proportion to their character length.
+// Cues times each segment's caption chunks: a chunk starts with its first
+// word and lasts until the next chunk (or the segment end).
 func Cues(segs []Timed, maxWords int) []Cue {
 	var cues []Cue
 	offset := 0.0
 	for _, s := range segs {
 		chunks := CaptionChunks(s.Text, maxWords)
-		total := 0
+		starts := wordStarts(s)
+		idx := 0
+		first := len(cues)
 		for _, c := range chunks {
-			total += len(c)
+			start := 0.0
+			if idx < len(starts) {
+				start = starts[idx]
+			}
+			if len(cues) == first {
+				start = 0 // the first chunk covers any leading silence
+			}
+			cues = append(cues, Cue{Start: offset + start, Text: c})
+			idx += len(strings.Fields(c))
 		}
-		t := offset
-		for _, c := range chunks {
-			d := s.Duration * float64(len(c)) / float64(max(total, 1))
-			cues = append(cues, Cue{Start: t, End: t + d, Text: c})
-			t += d
+		for i := first; i < len(cues); i++ {
+			if i+1 < len(cues) {
+				cues[i].End = cues[i+1].Start
+			} else {
+				cues[i].End = offset + s.Duration
+			}
 		}
 		offset += s.Duration
 	}

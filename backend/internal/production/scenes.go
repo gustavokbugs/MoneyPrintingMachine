@@ -216,21 +216,29 @@ type CaptionChunk struct {
 	Hot bool
 }
 
-// CaptionTrack splits narration into short caption lines with an estimated
-// time per word (proportional to word length within each line).
+// CaptionTrack splits narration into short caption lines and times every
+// word (measured when available, see wordStarts).
 func CaptionTrack(segs []Timed, maxWords int) []CaptionChunk {
 	var out []CaptionChunk
-	for _, c := range Cues(segs, maxWords) {
-		words := strings.Fields(c.Text)
-		total := 0
-		for _, w := range words {
-			total += len([]rune(w)) + 1
+	cues := Cues(segs, maxWords)
+	var at []float64 // absolute start of every word, in caption order
+	offset := 0.0
+	for _, s := range segs {
+		for _, w := range wordStarts(s) {
+			at = append(at, offset+w)
 		}
+		offset += s.Duration
+	}
+	k := 0
+	for _, c := range cues {
 		ch := CaptionChunk{Start: c.Start, End: c.End}
-		t := c.Start
-		for _, w := range words {
+		for j, w := range strings.Fields(c.Text) {
+			t := c.Start
+			if j > 0 && k < len(at) {
+				t = min(max(at[k], c.Start), c.End)
+			}
 			ch.Words = append(ch.Words, CaptionWord{Text: w, At: t})
-			t += (c.End - c.Start) * float64(len([]rune(w))+1) / float64(max(total, 1))
+			k++
 		}
 		out = append(out, ch)
 	}

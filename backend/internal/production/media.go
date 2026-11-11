@@ -29,6 +29,9 @@ type Tools struct {
 	// ExtraLexicon is a generated supplement lexicon (see lexicon.go).
 	ExtraLexicon string
 	FontsDir     string // directory with Inter TTF files
+	// Word timing (optional): sherpa-onnx-offline with a Parakeet model.
+	ASR      string
+	ASRModel string
 
 	// Animated scenes (optional): Node runs the HyperFrames CLI from the
 	// renderer workspace; GSAP and web fonts are vendored there.
@@ -82,6 +85,8 @@ func ToolsFromRoot(root string) Tools {
 		TTS:      exe(filepath.Join("sherpa-onnx", "bin", "sherpa-onnx-offline-tts.exe")),
 		ModelDir: exe(filepath.Join("models", "kokoro-multi-lang-v1_0")),
 		FontsDir: exe("fonts"),
+		ASR:      exe(filepath.Join("sherpa-onnx", "bin", "sherpa-onnx-offline.exe")),
+		ASRModel: exe(filepath.Join("models", AlignerModelDir)),
 	}
 }
 
