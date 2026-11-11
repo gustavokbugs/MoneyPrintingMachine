@@ -82,6 +82,9 @@ func (s *Service) GenerateScript(ctx context.Context, ch *channel.Channel, v *Vi
 	if ch.Blueprint == nil || v.IdeaIndex >= len(ch.Blueprint.Ideas) {
 		return nil, &channel.ValidationError{Field: "ideaIndex", Message: "the blueprint idea no longer exists"}
 	}
+	if v.VisualStyle == StyleBuild3D {
+		return s.generateSceneScript(ctx, ch, v, sceneFor(v))
+	}
 	idea := ch.Blueprint.Ideas[v.IdeaIndex]
 	words := int(float64(v.TargetSeconds) * WordsPerSecond * paceOf(v.StoryFormat))
 	sections := min(max(v.TargetSeconds/45, 2), 10)
@@ -105,12 +108,6 @@ func (s *Service) GenerateScript(ctx context.Context, ch *channel.Channel, v *Vi
 			sections = min(max(words/15, 4), 12)
 		}
 		shape = f.Guide + "\nThe hook is one line that makes scrolling past impossible.\nThe outro is one short punchline line; at most add \"follow for more\"."
-	}
-	if v.VisualStyle == StyleBuild3D {
-		// The scene has fixed stages: one section each, told in order.
-		sc := sceneFor(v)
-		sections = len(sc.Stages)
-		shape += scenePrompt(sc)
 	}
 	var audience, identity string
 	if ch.Strategy != nil {

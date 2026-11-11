@@ -2,6 +2,7 @@ package production
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,20 +37,39 @@ func TestBuildTimingMapsSectionsToStages(t *testing.T) {
 	}
 }
 
-func TestScenePromptListsEveryStage(t *testing.T) {
+func TestSceneScriptRewritesTheReference(t *testing.T) {
 	sc := Scenes3D[0]
-	p := scenePrompt(sc)
-	if !strings.Contains(p, "EXACTLY 10 sections") || !strings.Contains(p, "10. "+sc.Stages[9]) {
-		t.Errorf("prompt = %s", p)
+	ref := sc.Reference
+	if len(ref.Lines) != len(sc.Stages) {
+		t.Fatalf("the reference needs one line per stage: %d lines, %d stages", len(ref.Lines), len(sc.Stages))
 	}
-	gen := &scriptedGen{}
-	svc, _ := newTestService(t, gen, nil, Tools{})
-	_, _ = svc.GenerateScript(context.Background(), testChannel(), &Video{TargetSeconds: 60, VisualStyle: StyleBuild3D, StoryFormat: FormatFixChain})
-	if len(gen.requests) == 0 || !strings.Contains(gen.requests[0].Messages[1].Content, sc.Stages[0]) {
-		t.Fatal("3D build scripts must be written to the scene's stages")
+	lines := make([]string, len(ref.Lines))
+	for i := range lines {
+		lines[i] = fmt.Sprintf(`{"narration":"Fresh take number %d on this stage of the build.","onScreenText":"Step %d"}`, i+1, i+1)
 	}
-	if !strings.Contains(string(gen.requests[0].Schema), `"minItems":10`) {
-		t.Error("the schema must ask for one section per stage")
+	good := `{"hook":"A new hook.","outro":"Bye now.","lines":[` + strings.Join(lines, ",") + `]}`
+	svc, _ := newTestService(t, &scriptedGen{responses: []string{good}}, nil, Tools{})
+	v := &Video{Title: "Dams", TargetSeconds: 60, VisualStyle: StyleBuild3D, StoryFormat: FormatFixChain}
+	got, err := svc.GenerateScript(context.Background(), testChannel(), v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Hook != "A new hook." || got.Sections[3].Narration != "Fresh take number 4 on this stage of the build." || got.Sections[3].OnScreenText != "Step 4" {
+		t.Errorf("rewrite not used: %+v", got)
+	}
+	if len(got.Claims) != len(ref.Claims) || got.Claims[0].Status != ClaimUnverified {
+		t.Errorf("claims = %+v (the reference claims still need review)", got.Claims)
+	}
+
+	// A broken rewrite (repeated lines) or a model failure falls back to
+	// the reference, which keeps the scene and the words in step.
+	bad := `{"hook":"h","outro":"o","lines":[` + strings.Repeat(`{"narration":"Same line again and again here.","onScreenText":"x"},`, len(ref.Lines)-1) + `{"narration":"Same line again and again here.","onScreenText":"x"}]}`
+	for _, gen := range []*scriptedGen{{responses: []string{bad}}, {}} {
+		svc, _ := newTestService(t, gen, nil, Tools{})
+		got, err := svc.GenerateScript(context.Background(), testChannel(), v)
+		if err != nil || got.Hook != ref.Hook || got.Sections[0].Narration != ref.Lines[0].Narration || got.Provenance.Model != "reference" {
+			t.Errorf("fallback = %+v, %v", got, err)
+		}
 	}
 }
 

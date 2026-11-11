@@ -22,7 +22,9 @@ type Scene3D struct {
 	Name   string
 	Intro  string   // what the hook shows (stage 0)
 	Stages []string // what each narration section must describe
-	js     []byte
+	// Reference is the hand-checked script the model rewrites.
+	Reference SceneScript
+	js        []byte
 }
 
 // Scenes3D lists the available scenes.
@@ -41,7 +43,8 @@ var Scenes3D = []Scene3D{{
 		"The falling water spins a water wheel.",
 		"The wheel drives a generator; wires carry electricity to a house and its lights turn on.",
 	},
-	js: sceneDamJS,
+	Reference: damScript,
+	js:        sceneDamJS,
 }}
 
 // sceneFor returns the scene a video plays (one scene so far).
@@ -83,17 +86,6 @@ func buildTiming(segs []Timed, sc Scene3D) *BuildData {
 		d.Outro = starts[len(segs)-1]
 	}
 	return d
-}
-
-// scenePrompt is the script instruction that ties sections to stages.
-func scenePrompt(sc Scene3D) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "\nThis video plays over a 3D animation in stages. The hook plays over: %s\nWrite EXACTLY %d sections, in this order; section N narrates stage N and nothing else:\n", sc.Intro, len(sc.Stages))
-	for i, s := range sc.Stages {
-		fmt.Fprintf(&b, "%d. %s\n", i+1, s)
-	}
-	b.WriteString("Make the problems and fixes feel like a chain the viewer is doing (\"you\"). Keep every real fact true.")
-	return b.String()
 }
 
 // writeBuildAssets adds three.js (wrapped as a browser global) and the
