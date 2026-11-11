@@ -48,13 +48,18 @@ Dependencies point inward: `channel` knows nothing about HTTP, SQL, or models; a
 | React, React Router, TanStack Query, Vite, Vitest | MIT |
 | Ollama | MIT |
 | Qwen3 4B weights | Apache 2.0 (verify on the model card) |
-| Recommended fonts | SIL OFL 1.1 |
+| Recommended fonts; Inter, Fraunces, JetBrains Mono, Space Grotesk (@fontsource 5.3.0) | SIL OFL 1.1 |
+| FFmpeg 8.1 (BtbN GPL build) | GPL-3.0; used as a separate program, not linked |
+| sherpa-onnx v2.0.1 | Apache 2.0 |
+| Kokoro 82M voice model (int8 en v0_19) | Apache 2.0 (verify on the model card) |
+| HyperFrames 0.8.209 | Apache 2.0; telemetry disabled through environment variables |
+| GSAP 3.15.0 | GSAP Standard No-Charge License (free, including commercial use; may not be used in a tool that competes with Webflow) |
 
 ## Roadmap
 
 1. Done: YouTube Data API trend snapshots (demand, competition, momentum) and handle checks.
 2. Done: YouTube OAuth connection with PKCE, encrypted tokens, and platform verification.
 3. Done: scheduled watchlist re-measurement (every 15 minutes as a durable job) and RSS feeds as a news-mention source.
-4. Production pipeline: research with sources, scripts with citations and fact-check gates, local narration (Kokoro TTS, Apache 2.0, CPU-friendly), visuals (motion graphics, optional Stable Diffusion), FFmpeg rendering.
-5. Publishing with idempotency and platform-specific validation; TikTok and Instagram connections.
+4. Done: production pipeline: scripts with claims and a fact-check gate, local narration (Kokoro TTS), animated scenes (HyperFrames HTML + GSAP rendered by headless Chrome, with a plain-background fallback), FFmpeg rendering with burned-in captions.
+5. Done for YouTube: publishing with one upload per video and AI disclosure. Next: TikTok and Instagram connections.
 6. Analytics ingestion and the performance dashboard.

@@ -62,6 +62,15 @@ Channels reach **Ready** only after a platform connection is verified by the pla
 
    Open http://127.0.0.1:5173.
 
+5. Optional, for video production: install the media tools and the scene renderer.
+
+   ```sh
+   powershell -ExecutionPolicy Bypass -File scripts/setup-media-tools.ps1
+   cd renderer && npm install
+   ```
+
+   Without `renderer/`, videos render on a plain background.
+
 ## YouTube setup (optional)
 
 Both parts are free and use a Google Cloud project you own.
