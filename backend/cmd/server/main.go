@@ -95,8 +95,11 @@ func run(log *slog.Logger) error {
 	// Media tools and rendered files live in the repository's .local folder
 	// (see scripts/setup-media-tools.ps1).
 	localDir := filepath.Join("..", ".local")
+	// HyperFrames runs as a child process: keep its telemetry off and give it
+	// the verified FFmpeg from .local.
+	configureRendererEnv(localDir)
 	videos := production.NewService(postgres.NewVideoRepository(pool), channels, model,
-		production.ToolsFromRoot(localDir), production.ExecRunner{}, filepath.Join(localDir, "media"))
+		production.ToolsFromRoot(localDir).WithRenderer(filepath.Join("..", "renderer")), production.ExecRunner{}, filepath.Join(localDir, "media"))
 	for k, h := range videos.Handlers() {
 		handlers[k] = h
 	}
@@ -204,4 +207,19 @@ func withStatic(api http.Handler, dir string) http.Handler {
 		}
 		files.ServeHTTP(w, r)
 	})
+}
+
+// configureRendererEnv sets environment variables inherited by the
+// HyperFrames CLI: no telemetry, and the local FFmpeg build on PATH.
+func configureRendererEnv(localDir string) {
+	abs, err := filepath.Abs(localDir)
+	if err != nil {
+		return
+	}
+	bin := filepath.Join(abs, "ffmpeg", "bin")
+	_ = os.Setenv("HYPERFRAMES_NO_TELEMETRY", "1")
+	_ = os.Setenv("DO_NOT_TRACK", "1")
+	_ = os.Setenv("HYPERFRAMES_SKIP_SKILLS", "1")
+	_ = os.Setenv("HYPERFRAMES_FFMPEG_PATH", filepath.Join(bin, "ffmpeg.exe"))
+	_ = os.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 }

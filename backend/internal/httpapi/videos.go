@@ -18,6 +18,8 @@ type Videos interface {
 	ReviewClaim(ctx context.Context, ownerID, id string, index int, status, note string) (*production.Video, error)
 	Approve(ctx context.Context, ownerID, id string) (*production.Video, error)
 	SetVoice(ctx context.Context, ownerID, id string, voice int) (*production.Video, error)
+	SetStyle(ctx context.Context, ownerID, id, style string) (*production.Video, error)
+	AnimatedScenes() bool
 	CheckCanScript(ctx context.Context, ownerID, id string) (*production.Video, error)
 	CheckCanProduce(ctx context.Context, ownerID, id string) (*production.Video, error)
 	MediaPath(ctx context.Context, ownerID, id, name string) (string, error)
@@ -29,7 +31,8 @@ func (s *server) productionStatus(w http.ResponseWriter, _ *http.Request) {
 	if missing == nil {
 		missing = []string{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ready": len(missing) == 0, "missing": missing, "voices": production.Voices})
+	writeJSON(w, http.StatusOK, map[string]any{"ready": len(missing) == 0, "missing": missing, "voices": production.Voices,
+		"styles": production.Styles, "animatedScenes": s.Videos.AnimatedScenes()})
 }
 
 func (s *server) listVideos(w http.ResponseWriter, r *http.Request) {
@@ -165,4 +168,21 @@ func (s *server) videoMedia(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, no-cache")
 	// ServeFile supports range requests, which video players need.
 	http.ServeFile(w, r, p)
+}
+
+type styleRequest struct {
+	VisualStyle string `json:"visualStyle"`
+}
+
+func (s *server) setStyle(w http.ResponseWriter, r *http.Request) {
+	var req styleRequest
+	if !decode(w, r, &req) {
+		return
+	}
+	v, err := s.Videos.SetStyle(r.Context(), s.OwnerID, r.PathValue("id"), req.VisualStyle)
+	if err != nil {
+		s.writeDomainError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
 }
