@@ -188,6 +188,10 @@ func NormalizeForSpeech(text string, lex Lexicon) (string, []string) {
 				parts = append(parts, p)
 			case strings.HasSuffix(lw, "'s") && lex[strings.TrimSuffix(lw, "'s")]:
 				parts = append(parts, strings.TrimSuffix(strings.TrimSuffix(p, "'s"), "'S"))
+			case spellable(p, lex):
+				// Acronyms the voice does not know are read letter by
+				// letter ("POV" as "P O V").
+				parts = append(parts, strings.Join(strings.Split(lw, ""), " "))
 			default:
 				parts = append(parts, p)
 				oov[p] = true
@@ -201,4 +205,18 @@ func NormalizeForSpeech(text string, lex Lexicon) (string, []string) {
 	}
 	sort.Strings(missing)
 	return strings.Join(words, " "), missing
+}
+
+// spellable reports whether w is an all-capital acronym of 2 to 5 letters
+// whose letters the voice can say one by one.
+func spellable(w string, lex Lexicon) bool {
+	if n := len(w); n < 2 || n > 5 {
+		return false
+	}
+	for _, r := range w {
+		if r < 'A' || r > 'Z' || !lex[strings.ToLower(string(r))] {
+			return false
+		}
+	}
+	return true
 }

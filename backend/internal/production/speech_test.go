@@ -51,3 +51,17 @@ func TestLoadLexicon(t *testing.T) {
 		t.Fatalf("lex = %v %v", lex, err)
 	}
 }
+
+func TestNormalizeSpellsUnknownAcronyms(t *testing.T) {
+	lex := Lexicon{"p": true, "o": true, "v": true, "you": true, "u": true, "f": true}
+	got, oov := NormalizeForSpeech("POV: you. UFO! XQZ", lex)
+	if got != "p o v: you. u f o! XQZ" {
+		t.Errorf("normalized = %q", got)
+	}
+	if strings.Join(oov, ",") != "XQZ" {
+		t.Errorf("oov = %v (letters the voice lacks stay unpronounceable)", oov)
+	}
+	if spellable("Pov", lex) || spellable("P", lex) {
+		t.Error("only all-capital acronyms of 2 to 5 letters are spelled")
+	}
+}
