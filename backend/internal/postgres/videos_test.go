@@ -7,6 +7,7 @@ import (
 
 	"contentfactory/internal/channel"
 	"contentfactory/internal/production"
+	"contentfactory/internal/publishing"
 )
 
 func TestVideoRepository(t *testing.T) {
@@ -45,5 +46,40 @@ func TestVideoRepository(t *testing.T) {
 	list, err := r.ListByChannel(ctx, "alice", ch.ID)
 	if err != nil || len(list) != 1 {
 		t.Fatalf("list: %d %v", len(list), err)
+	}
+}
+
+func TestPublicationRepository(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	ch, _ := channel.NewDraft("alice", "Space", "", "")
+	_ = NewChannelRepository(pool).Create(ctx, ch)
+	v := &production.Video{OwnerID: "alice", ChannelID: ch.ID, Title: "Moon", AspectRatio: "16:9", TargetSeconds: 60, Status: production.StatusProduced}
+	if err := NewVideoRepository(pool).Create(ctx, v); err != nil {
+		t.Fatal(err)
+	}
+	r := NewPublicationRepository(pool)
+	p, err := r.Begin(ctx, "alice", v.ID, "youtube", "private")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Begin(ctx, "alice", v.ID, "youtube", "private"); !errors.Is(err, publishing.ErrInProgress) {
+		t.Fatalf("concurrent begin: %v", err)
+	}
+	_ = r.Finish(ctx, p.ID, publishing.StatusFailed, "", "", "boom")
+	p2, err := r.Begin(ctx, "alice", v.ID, "youtube", "unlisted")
+	if err != nil || p2.ID != p.ID || p2.Privacy != "unlisted" {
+		t.Fatalf("retry after failure: %+v %v", p2, err)
+	}
+	_ = r.Finish(ctx, p.ID, publishing.StatusPublished, "yt1", "https://www.youtube.com/watch?v=yt1", "")
+	if _, err := r.Begin(ctx, "alice", v.ID, "youtube", "public"); !errors.Is(err, publishing.ErrAlreadyPublished) {
+		t.Fatalf("after success: %v", err)
+	}
+	list, err := r.ListForVideo(ctx, "alice", v.ID)
+	if err != nil || len(list) != 1 || list[0].ExternalID != "yt1" {
+		t.Fatalf("list: %+v %v", list, err)
+	}
+	if other, _ := r.ListForVideo(ctx, "bob", v.ID); len(other) != 0 {
+		t.Fatal("publications must be owner-scoped")
 	}
 }
