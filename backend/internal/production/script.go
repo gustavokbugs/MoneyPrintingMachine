@@ -14,9 +14,9 @@ import (
 )
 
 // WordsPerSecond is the narration pace used to size scripts: the Kokoro
-// voice's measured rate including the pauses between segments (about
-// 170 words per minute).
-const WordsPerSecond = 2.8
+// voice's measured rate at normal speed, including the pauses between
+// segments (about 210 words per minute).
+const WordsPerSecond = 3.5
 
 type scriptOutput struct {
 	Hook     string `json:"hook"`

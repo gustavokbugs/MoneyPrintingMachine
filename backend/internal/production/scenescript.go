@@ -26,18 +26,18 @@ type SceneLine struct{ Narration, OnScreen string }
 
 // damScript is the reference for the dam scene.
 var damScript = SceneScript{
-	Hook: "Your house is dark every night, but you live next to a river. Let's build power.",
+	Hook: "Your house is dark every night, but you live right next to a river. So let's build power from scratch.",
 	Lines: []SceneLine{
-		{"First, you roll big stones into the river, bank to bank. A wall! Done? Not even close.", "Stones"},
-		{"The water just squeezes through the gaps between the stones, like they aren't even there.", "Gaps"},
+		{"First, you roll big stones into the river, all the way from bank to bank. A wall! Done? Not even close.", "Stones"},
+		{"The water just squeezes through the gaps between the stones, like they aren't even there at all.", "Gaps"},
 		{"So you dig up clay and pack it into every gap. Sticky, heavy, and watertight. The leaks stop.", "Clay"},
-		{"Now the water has nowhere to go, so it piles up behind your wall. Congrats, you just made a lake.", "A lake"},
+		{"Now the water has nowhere to go, so it piles up higher and higher behind your wall. Congrats, you just made a lake.", "A lake"},
 		{"But the lake keeps filling, and filling, until the water starts pouring right over the top.", "Overflow"},
-		{"The falling water digs at the base of the wall, and the whole thing washes away downstream.", "Gone"},
+		{"The falling water digs away at the base of the wall, until the whole thing gives up and washes away downstream.", "Gone"},
 		{"So you build a real dam out of cut stone, thick at the bottom, because deep water pushes the hardest down there.", "A real dam"},
 		{"Then you add a spillway, a side channel that lets extra water out before the lake can reach the top.", "Spillway"},
-		{"All that falling water is wasted, so you put a water wheel under it, and it spins.", "Water wheel"},
-		{"Hook the wheel to a generator, run wires to your house, and the lights finally come on.", "Power"},
+		{"All that falling water is just wasted, so you put a water wheel right under it, and it starts to spin.", "Water wheel"},
+		{"Hook the wheel up to a generator, run wires across the field to your house, and the lights finally come on.", "Power"},
 	},
 	Outro: "Congrats. You just built a hydroelectric dam. Follow for more.",
 	Claims: []Claim{

@@ -50,7 +50,7 @@ Example beats on another topic (copy the rhythm, not the content): "You're cold.
 }
 
 // ShortPace is the narration speed of the short formats.
-const ShortPace = 1.1
+const ShortPace = 1.0 // Kokoro already speaks about 3.5 words/s; faster felt rushed
 
 // paceOf returns the narration speed for a video's format (1 = normal).
 func paceOf(format string) float64 {
