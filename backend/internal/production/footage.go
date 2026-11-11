@@ -144,7 +144,7 @@ type FootageShot struct {
 
 // planFootage picks and downloads a clip for every shot. A clip is reused
 // only when the searches return too few distinct clips.
-func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]string, width, height int, cacheDir string) ([]FootageShot, error) {
+func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]string, niche string, width, height int, cacheDir string) ([]FootageShot, error) {
 	orientation := "landscape"
 	if height > width {
 		orientation = "portrait"
@@ -162,14 +162,13 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 		searched[q] = c
 		return c, nil
 	}
-	var shots []FootageShot
+	// Find a pool of clips per segment. Narrow queries often find nothing
+	// on free archives, so broaden them before giving up on a segment.
+	pools := make([][]stock.Clip, len(segs))
+	var all []stock.Clip
 	for i, seg := range segs {
-		lengths := shotLengths(seg.Duration)
-		if i == len(segs)-1 && len(lengths) > 0 {
-			lengths[len(lengths)-1] += 0.6 // cover the audio tail
-		}
-		var pool []stock.Clip
-		for _, q := range queries[i] {
+		need := 2 * len(shotLengths(seg.Duration))
+		for _, q := range broaden(queries[i], niche) {
 			c, err := search(q)
 			if err != nil {
 				if errors.Is(err, stock.ErrNoKey) || errors.Is(err, stock.ErrRateLimited) {
@@ -177,13 +176,25 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 				}
 				continue // a failed query is skipped; others may work
 			}
-			pool = append(pool, c...)
-			if len(pool) >= len(lengths)*2 {
+			pools[i] = append(pools[i], c...)
+			if len(pools[i]) >= need {
 				break
 			}
 		}
+		all = append(all, pools[i]...)
+	}
+	if len(all) == 0 {
+		return nil, fmt.Errorf("no stock footage found for any segment (%s)", strings.Join(queries[0], "; "))
+	}
+	var shots []FootageShot
+	for i, seg := range segs {
+		lengths := shotLengths(seg.Duration)
+		if i == len(segs)-1 && len(lengths) > 0 {
+			lengths[len(lengths)-1] += 0.6 // cover the audio tail
+		}
+		pool := pools[i]
 		if len(pool) == 0 {
-			return nil, fmt.Errorf("no stock footage found for segment %d (%s)", i+1, strings.Join(queries[i], "; "))
+			pool = all // borrow on-topic clips found for other segments
 		}
 		for k, length := range lengths {
 			clip, ok := pickClip(pool, used, length)
@@ -204,6 +215,29 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 		}
 	}
 	return shots, nil
+}
+
+// broaden returns the queries followed by shorter forms of them and the
+// niche, without duplicates.
+func broaden(queries []string, niche string) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(q string) {
+		if q = cleanQuery(q); q != "" && !seen[q] {
+			seen[q] = true
+			out = append(out, q)
+		}
+	}
+	for _, q := range queries {
+		add(q)
+	}
+	for _, q := range queries {
+		if f := strings.Fields(q); len(f) > 2 {
+			add(strings.Join(f[len(f)-2:], " ")) // the head noun is usually last
+		}
+	}
+	add(niche)
+	return out
 }
 
 // pickClip returns the first unused clip long enough for the shot, else
@@ -287,7 +321,7 @@ func (s *Service) renderFootage(ctx context.Context, dir string, segs []Timed, n
 		return "", nil, stock.ErrNoKey
 	}
 	queries := s.footageQueries(ctx, segs, niche)
-	shots, err := s.planFootage(ctx, segs, queries, width, height, filepath.Join(s.mediaDir, "stock-cache"))
+	shots, err := s.planFootage(ctx, segs, queries, niche, width, height, filepath.Join(s.mediaDir, "stock-cache"))
 	if err != nil {
 		return "", nil, err
 	}

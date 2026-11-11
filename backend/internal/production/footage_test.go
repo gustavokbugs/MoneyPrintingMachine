@@ -78,7 +78,7 @@ func TestPlanFootageAvoidsReuseAndCoversDuration(t *testing.T) {
 	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
 	svc.WithFootage(f)
 	segs := []Timed{{Duration: 7}, {Duration: 3.5}}
-	shots, err := svc.planFootage(context.Background(), segs, [][]string{{"moon"}, {"moon"}}, 1080, 1920, t.TempDir())
+	shots, err := svc.planFootage(context.Background(), segs, [][]string{{"moon"}, {"moon"}}, "", 1080, 1920, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,11 +110,11 @@ func TestPlanFootageAvoidsReuseAndCoversDuration(t *testing.T) {
 func TestPlanFootageErrors(t *testing.T) {
 	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
 	svc.WithFootage(&fakeFootage{err: stock.ErrRateLimited})
-	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"x"}}, 1920, 1080, t.TempDir()); !errors.Is(err, stock.ErrRateLimited) {
+	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"x"}}, "", 1920, 1080, t.TempDir()); !errors.Is(err, stock.ErrRateLimited) {
 		t.Fatalf("rate limit: %v", err)
 	}
 	svc.WithFootage(&fakeFootage{results: map[string][]stock.Clip{}})
-	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"x"}}, 1920, 1080, t.TempDir()); err == nil {
+	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"x"}}, "", 1920, 1080, t.TempDir()); err == nil {
 		t.Fatal("expected an error when nothing is found")
 	}
 }
@@ -178,5 +178,38 @@ func TestPlanEffectsFootageWhooshesOnCuts(t *testing.T) {
 	cues := PlanEffects(scenes, StyleFootage)
 	if len(cues) != 3 || cues[0].Kind != SFXImpact || cues[1].Kind != SFXWhoosh || cues[2].Kind != SFXWhoosh {
 		t.Fatalf("cues = %+v (no counter ticks without counters)", cues)
+	}
+}
+
+// A segment whose queries find nothing broadens them, then borrows clips
+// found for other segments instead of failing the whole video.
+func TestPlanFootageBroadensAndBorrows(t *testing.T) {
+	f := &fakeFootage{results: map[string][]stock.Clip{
+		"petri dish":      {{ID: 1, Duration: 10}},
+		"penicillin mold": {{ID: 2, Duration: 10}},
+	}}
+	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
+	svc.WithFootage(f)
+	segs := []Timed{{Duration: 3}, {Duration: 3}, {Duration: 3}}
+	queries := [][]string{{"1920s london lab bench"}, {"messy bacteria petri dish"}, {"bacteria"}}
+	shots, err := svc.planFootage(context.Background(), segs, queries, "penicillin mold", 1080, 1920, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(shots) != 3 {
+		t.Fatalf("shots = %d, want 3", len(shots))
+	}
+	if shots[1].Clip.ID != 1 {
+		t.Errorf("segment 2 should use the broadened query, got clip %d", shots[1].Clip.ID)
+	}
+	if shots[0].Clip.ID == 0 || shots[2].Clip.ID == 0 {
+		t.Errorf("segments without results must still get a clip: %+v", shots)
+	}
+}
+
+func TestBroaden(t *testing.T) {
+	got := strings.Join(broaden([]string{"messy lab bench", "lab bench"}, "Science History"), "|")
+	if got != "messy lab bench|lab bench|science history" {
+		t.Errorf("broaden = %q", got)
 	}
 }
