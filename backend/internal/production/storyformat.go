@@ -26,8 +26,10 @@ type StoryFormat struct {
 	Seconds int `json:"seconds"`
 	// Pace is the narration speed (0 means normal); short formats talk
 	// fast, like popular Shorts (about 3 words per second).
-	Pace  float64 `json:"-"`
-	Guide string  `json:"-"`
+	Pace float64 `json:"-"`
+	// NoMusic drops the music bed so word sound effects carry the mood.
+	NoMusic bool   `json:"-"`
+	Guide   string `json:"-"`
 }
 
 // StoryFormats lists the formats, explainer first.
@@ -37,7 +39,7 @@ var StoryFormats = []StoryFormat{
 		Example: "You leave your lunch in your bag for a month... congrats, you just discovered antibiotics.",
 		Guide: `Format: absurd escalation. Talk to the viewer as "you". Start with an ordinary, harmless action. Each section escalates by one step, with deadpan, unhinged humor ("congrats", "at this point", "you are now legally a..."), until the last step lands on a surprising real outcome tied to the topic. The hook is the punchline teased in one line ("If you do this, you accidentally ___."). Every step stays absurd or harmless: never give real, usable instructions for anything dangerous (weapons, explosives, toxic mixtures, hacking). The real facts the joke rests on must be true and listed in claims. Each section is ONE new step, never a repeat of the last one.
 Example beats on another topic (copy the rhythm, not the content): Hook: "If you skip the dishes before vacation, you accidentally save millions of lives." / "You leave a dirty plate in the lab. Classic." / "You go on vacation. The plate does not." / "You come back. Something blue and fuzzy is living on it." / "Congrats, it is killing the bacteria around it." / "You just found penicillin. That was Alexander Fleming, 1928." / Outro: "Do your dishes. Or don't. Follow for more."`},
-	{ID: FormatPOV, Name: "POV story", Seconds: ShortFormatSeconds, Pace: ShortPace,
+	{ID: FormatPOV, Name: "POV story", Seconds: ShortFormatSeconds, Pace: ShortPace, NoMusic: true,
 		Example: "Your girlfriend is in the shower. Steam pours out of the walls. You ask: \"Are you cooking yourself?\"",
 		Guide: `Format: POV story. Narrate in second person, present tense ("You walk in. You see..."), like a chaotic short film about the viewer's life. Use quick, vivid beats and short spoken lines from the other character in quotes. Build to an absurd twist, then reveal the real fact or idea from the topic in one line near the end. Keep it playful, never cruel, sexual, or demeaning. Each section is ONE new beat.
 Example beats on another topic (copy the rhythm, not the content): "You walk into the kitchen at 3 a.m." / "Your roommate is staring into the fridge." / "'It's humming at me,' she whispers." / "You open it. It's 4 degrees colder than the room. Every night." / "'It's not haunted,' you say. 'It's a heat pump.'" / "It moves heat out of the box and onto your floor."`},
@@ -56,6 +58,12 @@ func paceOf(format string) float64 {
 		return f.Pace
 	}
 	return 1
+}
+
+// musicOff reports whether a format plays without music.
+func musicOff(format string) bool {
+	f, ok := storyFormat(format)
+	return ok && f.NoMusic
 }
 
 // storyFormat returns the format definition, or ok=false.

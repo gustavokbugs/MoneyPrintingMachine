@@ -504,12 +504,20 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		}
 	}
 	// Soundtrack: an original music bed and effects synthesized in code.
+	// Formats that want immersion drop the music and lean on effects.
 	mood := MoodFor(resolved)
 	mix := AudioMix{Voice: audios, Music: "music.wav", Effects: "effects.wav"}
-	if err := ComposeMusic(mood, total+1, v.ID+":"+mood.Name).WriteWAV(filepath.Join(dir, mix.Music)); err != nil {
+	music := "Original score generated in code (" + mood.Description + "); no third-party audio."
+	if musicOff(v.StoryFormat) {
+		mix.Music, music = "", "No music; sound effects generated in code."
+	} else if err := ComposeMusic(mood, total+1, v.ID+":"+mood.Name).WriteWAV(filepath.Join(dir, mix.Music)); err != nil {
 		return nil, fmt.Errorf("compose music: %w", err)
 	}
 	effects := PlanEffects(scenes, resolved)
+	if resolved == StyleGameplay {
+		// Sounds on the words that name them ("burning" sizzles).
+		effects = append(effects, PlanWordEffects(segs)...)
+	}
 	if visual == "" {
 		// Without animated scenes there are no transitions to accent.
 		effects = nil
@@ -533,7 +541,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		VideoFile: "video.mp4", CaptionsFile: "captions.srt", DurationSeconds: dur,
 		Width: width, Height: height, RenderedAt: s.now().UTC(), SyntheticVoice: true,
 		Visuals: visuals, VisualsNote: note,
-		Music:        "Original score generated in code (" + mood.Description + "); no third-party audio.",
+		Music:        music,
 		SoundEffects: len(effects), CaptionTiming: timing, Footage: credits,
 	}, nil
 }
