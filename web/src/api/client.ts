@@ -18,6 +18,8 @@ import type {
   LaunchReview,
   PlatformCapability,
   PlatformConnection,
+  Privacy,
+  Publication,
   ProductionStatus,
   SavedNiche,
   Strategy,
@@ -208,6 +210,14 @@ export const api = {
   generateVideoScript: async (id: string, key: string) => asJob(await request("POST", `/api/videos/${encodeURIComponent(id)}/script/generate`, undefined, idem(key))),
   produceVideo: async (id: string, key: string) => asJob(await request("POST", `/api/videos/${encodeURIComponent(id)}/produce`, undefined, idem(key))),
   videoMediaUrl: (id: string, file: "video.mp4" | "captions.srt", version: number) => `/api/videos/${encodeURIComponent(id)}/media/${file}?v=${version}`,
+
+  publishVideo: async (id: string, privacy: Privacy, key: string) =>
+    asJob(await request("POST", `/api/videos/${encodeURIComponent(id)}/publish`, { privacy }, idem(key))),
+  publications: async (id: string) =>
+    asItems(
+      await request("GET", `/api/videos/${encodeURIComponent(id)}/publications`),
+      asRecordOf<Publication>("publication", ["id", "status", "privacy"]),
+    ),
 
   platforms: async () =>
     asItems(await request("GET", "/api/platforms"), asRecordOf<PlatformCapability>("platform", ["platform", "steps"])),

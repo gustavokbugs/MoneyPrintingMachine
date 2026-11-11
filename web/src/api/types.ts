@@ -393,3 +393,18 @@ export interface ProductionStatus {
 }
 
 export type VisualStyle = "auto" | "minimal" | "documentary" | "bold" | "tech";
+
+export type Privacy = "private" | "unlisted" | "public";
+
+export interface Publication {
+  id: string;
+  videoId: string;
+  platform: string;
+  status: "uploading" | "published" | "failed";
+  privacy: Privacy;
+  externalId: string;
+  url: string;
+  error: string;
+  createdAt: string;
+  updatedAt: string;
+}

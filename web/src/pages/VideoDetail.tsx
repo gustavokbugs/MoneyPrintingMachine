@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, newIdempotencyKey } from "../api/client";
 import type { ClaimStatus, Video, VideoScript, VisualStyle } from "../api/types";
 import { EditableText } from "../components/EditableText";
+import { PublishPanel } from "../components/PublishPanel";
 import { useToast } from "../components/feedback";
 import { Badge, Button, Empty, ErrorState, JobProgress, Notice, ProvenanceNote, Section, SkeletonCard, errorMessage } from "../components/ui";
 import { useJob } from "../hooks/useJob";
@@ -249,6 +250,8 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
           )}
         </Section>
       )}
+
+      {v.output && <PublishPanel video={v} />}
     </>
   );
 }
