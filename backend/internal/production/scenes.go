@@ -301,6 +301,8 @@ type ProjectInput struct {
 	Captions []CaptionChunk
 	// Seed makes decorative randomness (particles) repeatable.
 	Seed uint32
+	// Pops are photos that pop up on key words (gameplay story only).
+	Pops []ImagePop
 }
 
 type projectView struct {
@@ -312,6 +314,14 @@ type projectView struct {
 	CaptionBottom int
 	Data          []sceneData
 	CaptionData   []captionData
+	PopData       []popData
+}
+
+type popData struct {
+	ID    string  `json:"id"`
+	Src   string  `json:"src"`
+	Start float64 `json:"start"`
+	End   float64 `json:"end"`
 }
 
 type captionData struct {
@@ -362,6 +372,17 @@ func WriteProject(dir string, in ProjectInput, gsapPath, fontsPkgDir string) err
 	tmpl := projectTemplate
 	if in.Style == StyleGameplay {
 		tmpl = storyTemplate
+		for i, p := range in.Pops {
+			ext := strings.ToLower(filepath.Ext(p.Path))
+			if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+				continue
+			}
+			name := fmt.Sprintf("pop-%d%s", i, ext)
+			if err := copyFile(p.Path, filepath.Join(dir, "assets", name)); err != nil {
+				return fmt.Errorf("copy pop image: %w", err)
+			}
+			v.PopData = append(v.PopData, popData{ID: fmt.Sprintf("p%d", i), Src: "assets/" + name, Start: p.Start, End: p.End})
+		}
 	}
 	var b bytes.Buffer
 	if err := tmpl.Execute(&b, v); err != nil {

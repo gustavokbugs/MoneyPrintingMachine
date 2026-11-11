@@ -447,10 +447,19 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 			visuals = FootageLabel(credits)
 		}
 	}
+	var pops []ImagePop
+	if resolved == StyleGameplay && s.tools.AnimatedScenes() && s.FootageAvailable() {
+		// Photos that pop up on key words; the story renders without them.
+		if pops, err = s.planImagePops(rctx, segs, width, height); err != nil {
+			note = strings.TrimSpace(note + " Pop-up images were skipped: " + truncateErr(err, 200))
+		}
+		credits = PopCredits(pops)
+	}
 	if resolved != StyleFootage && s.tools.AnimatedScenes() {
 		visual, err = s.renderScenes(rctx, dir, ProjectInput{
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
 			ChannelName: ch.Name, Scenes: scenes, Captions: captionsFor(resolved, segs, width, height), Seed: seedOf(v.ID),
+			Pops: pops,
 		})
 		if err != nil {
 			visual, note = "", "Animated scenes failed, so a plain background was used: "+truncateErr(err, 300)

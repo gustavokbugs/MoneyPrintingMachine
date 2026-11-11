@@ -40,6 +40,10 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
 .cap.hot { color: #FFE14D; }
 .cap.spk-b { color: #7FDBFF; }
 .cap.spk-b.hot { color: #FFE14D; }
+.pop { position: absolute; left: 50%; top: 17%; width: 64%; height: 27%; z-index: 4; visibility: hidden;
+  margin-left: -32%; background: #FFFFFF; padding: calc(var(--u) * 1.6); border-radius: calc(var(--u) * 3);
+  box-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 6) rgba(0,0,0,0.5); }
+.pop img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: calc(var(--u) * 1.8); }
 .end { position: absolute; left: 50%; bottom: 11%; z-index: 3; transform: translateX(-50%); visibility: hidden; white-space: nowrap;
   background: var(--accent); color: #FFFFFF; font-weight: 800; font-size: calc(var(--u) * 4.4); padding: calc(var(--u) * 2.2) calc(var(--u) * 5);
   border-radius: 999px; box-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0,0,0,0.35); }
@@ -56,7 +60,10 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
     <div class="who"><span class="dot"></span><span>{{$.ChannelName}}</span></div>
     <div class="title">{{.Headline}}</div>
   </div>
-{{end}}{{end}}  <div class="caps clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="2">
+{{end}}{{end}}  <div class="pops clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="4">
+{{range .PopData}}    <div class="pop" id="{{.ID}}"><img src="{{.Src}}" alt=""></div>
+{{end}}  </div>
+  <div class="caps clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="2">
 {{range $i, $c := .Captions}}    <div class="cap{{if $c.Hot}} hot{{end}}{{if eq $c.Speaker "B"}} spk-b{{end}}" id="{{cid $i}}" style="{{capsize $c}}">{{range $c.Words}}{{.Text}} {{end}}</div>
 {{end}}  </div>
   <div class="fx clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="3">
@@ -67,6 +74,7 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
 <script>
 (function () {
   var CAPS = {{.CaptionData}};
+  var POPS = {{.PopData}} || [];
   var U = {{.Unit}};
   var TOTAL = {{.Total}};
   var W = {{.Width}}, H = {{.Height}};
@@ -263,6 +271,16 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
     tl.set(el, { autoAlpha: 1 }, c.start);
     tl.fromTo(el, { scale: 0.55, rotation: tilt }, { scale: 1, rotation: 0, duration: 0.14, ease: "back.out(2.6)", immediateRender: false }, c.start);
     tl.set(el, { autoAlpha: 0 }, c.end);
+  });
+
+  // Photos pop up on their key word, wobble slightly, then shrink away.
+  POPS.forEach(function (p, i) {
+    var el = document.getElementById(p.id);
+    var tilt = i % 2 ? 4 : -4;
+    tl.set(el, { autoAlpha: 1 }, p.start);
+    tl.fromTo(el, { scale: 0.2, rotation: tilt * 3 }, { scale: 1, rotation: tilt * 0.5, duration: 0.28, ease: "back.out(2.2)", immediateRender: false }, p.start);
+    tl.to(el, { rotation: -tilt * 0.25, duration: Math.max(0.1, p.end - p.start - 0.45), ease: "sine.inOut" }, p.start + 0.28);
+    tl.to(el, { scale: 0.6, autoAlpha: 0, duration: 0.16, ease: "power2.in" }, p.end - 0.16);
   });
 
   if (TOTAL > 4) {
