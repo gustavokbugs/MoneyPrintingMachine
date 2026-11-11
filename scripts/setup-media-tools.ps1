@@ -6,12 +6,15 @@
   - FFmpeg 8.1 GPL build (BtbN/FFmpeg-Builds), verified against the
     release's checksums.sha256 (the build is refreshed daily upstream).
   - sherpa-onnx v2.0.1 (Apache-2.0) offline text-to-speech tools, pinned SHA-256.
-  - Kokoro int8 English v0.19 voice model (Apache-2.0) and the English
-    lexicon sherpa-onnx v2 needs, pinned SHA-256.
+  - Kokoro v1.0 full-precision voice model (Apache-2.0) with its English
+    lexicons, pinned SHA-256.
   - Inter 4.1 font (SIL OFL 1.1), pinned SHA-256 of the first verified download.
 #>
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+# Windows bsdtar (handles .tar.bz2 and drive-letter paths); a GNU tar
+# earlier on PATH, e.g. from Git Bash, does not.
+$tar = Join-Path $env:SystemRoot 'System32\tar.exe'
 
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
 $local = Join-Path $root '.local'
@@ -66,7 +69,7 @@ if (-not (Test-Path (Join-Path $ttsDir 'bin\sherpa-onnx-offline-tts.exe'))) {
   $tmp = Join-Path $dl 'sherpa-extract'
   if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
   New-Item -ItemType Directory $tmp | Out-Null
-  tar -xjf $arc -C $tmp
+  & $tar -xjf $arc -C $tmp
   $inner = Get-ChildItem $tmp -Directory | Select-Object -First 1
   if (Test-Path $ttsDir) { Remove-Item $ttsDir -Recurse -Force }
   Move-Item $inner.FullName $ttsDir
@@ -74,22 +77,15 @@ if (-not (Test-Path (Join-Path $ttsDir 'bin\sherpa-onnx-offline-tts.exe'))) {
 }
 
 # --- Kokoro voice model ---------------------------------------------------
-$modelDir = Join-Path $local 'models\kokoro-int8-en-v0_19'
+# Full-precision v1.0 weights: the int8 v0.19 build adds audible hiss.
+$modelDir = Join-Path $local 'models\kokoro-multi-lang-v1_0'
 if (-not (Test-Path (Join-Path $modelDir 'voices.bin'))) {
-  $name = 'kokoro-int8-en-v0_19.tar.bz2'
+  $name = 'kokoro-multi-lang-v1_0.tar.bz2'
   $arc = Get-Verified "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/$name" $name `
-    'c9f0dd393615805b0bab050c340834d5e684e732aec91c0e860cd30e982c08bd'
+    '60703707bc05ccd48d60e1eb723f38b07d6e474795a0b6a588d7220400e0f7a4'
   $models = Join-Path $local 'models'
   New-Item -ItemType Directory -Force $models | Out-Null
-  tar -xjf $arc -C $models
-}
-
-# --- English lexicon (sherpa-onnx v2 no longer bundles espeak-ng) ---
-$lexicon = Join-Path $modelDir 'lexicon-en-us.txt'
-if (-not (Test-Path $lexicon)) {
-  $lex = Get-Verified 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/lexicon-en-us.txt' 'lexicon-en-us.txt' `
-    '8b67ae549a465eee78f92ecb74644ad90c3c58ce65f19c68baf85878a10ef73a'
-  Copy-Item $lex $lexicon -Force
+  & $tar -xjf $arc -C $models
 }
 
 # --- Inter font -----------------------------------------------------------
