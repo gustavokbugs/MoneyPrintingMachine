@@ -160,6 +160,10 @@ type Output struct {
 	// SyntheticVoice records that narration is AI-generated, which platforms
 	// may require creators to disclose.
 	SyntheticVoice bool `json:"syntheticVoice"`
+	// Visuals records how the picture was made: "animated:<style>" or
+	// "solid" (fallback), plus a note when the fallback was used.
+	Visuals     string `json:"visuals"`
+	VisualsNote string `json:"visualsNote,omitempty"`
 }
 
 // Video is one production unit.
@@ -175,6 +179,7 @@ type Video struct {
 	Status        Status    `json:"status"`
 	StatusReason  string    `json:"statusReason"`
 	VoiceID       int       `json:"voiceId"`
+	VisualStyle   string    `json:"visualStyle"`
 	Script        *Script   `json:"script"`
 	Output        *Output   `json:"output"`
 	Version       int       `json:"version"`
