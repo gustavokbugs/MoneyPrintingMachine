@@ -11,6 +11,7 @@ import { Launchpad } from "./pages/Launchpad";
 import { Trends } from "./pages/Trends";
 import { ChannelVideos } from "./pages/ChannelVideos";
 import { VideoDetail } from "./pages/VideoDetail";
+import { ActivityCenter } from "./components/ActivityCenter";
 
 type ThemeChoice = "system" | "light" | "dark";
 const THEME_KEY = "theme";
@@ -116,6 +117,7 @@ export function App() {
           ))}
         </nav>
         <div className="sidebar-footer">
+          <ActivityCenter />
           <ThemeToggle />
         </div>
       </aside>

@@ -130,6 +130,7 @@ export interface Job {
   kind: string;
   channelId?: string;
   status: JobStatus;
+  input?: unknown;
   result?: unknown;
   error?: string;
   attempts: number;

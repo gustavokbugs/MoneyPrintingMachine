@@ -1338,3 +1338,15 @@ dialog.dialog::backdrop {
 th[scope="row"] {
   font-weight: 400;
 }
+
+/* Activity center (sidebar) */
+.activity { position: relative; }
+.activity-toggle { width: 100%; justify-content: flex-start; gap: 0.5rem; }
+.activity-badge { margin-left: auto; min-width: 1.4rem; padding: 0 0.4rem; border-radius: 999px; background: var(--color-primary); color: var(--color-on-primary); font-size: 0.75rem; line-height: 1.4rem; text-align: center; }
+.activity-panel { position: absolute; left: 0; bottom: calc(100% + 0.5rem); width: 22rem; max-width: calc(100vw - 2rem); max-height: 60vh; overflow: auto; z-index: 50; display: flex; flex-direction: column; gap: 0.6rem; }
+.activity-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.activity-item { display: flex; gap: 0.5rem; align-items: flex-start; }
+.activity-body { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 1023px) {
+  .activity-panel { bottom: auto; top: calc(100% + 0.5rem); left: auto; right: 0; }
+}

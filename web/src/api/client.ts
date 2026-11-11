@@ -115,6 +115,7 @@ export const api = {
     asChannel(await request("PUT", `/api/channels/${encodeURIComponent(id)}/blueprint`, b)),
   generate: async (id: string, step: "strategy" | "identity" | "blueprint", key: string) =>
     asJob(await request("POST", `/api/channels/${encodeURIComponent(id)}/${step}/generate`, undefined, idem(key))),
+  recentJobs: async () => asItems(await request("GET", "/api/jobs"), asJob),
   autopilot: async (id: string, key: string) =>
     asJob(await request("POST", `/api/channels/${encodeURIComponent(id)}/autopilot`, undefined, idem(key))),
   connections: async (id: string) =>
