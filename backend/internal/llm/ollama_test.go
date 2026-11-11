@@ -96,3 +96,23 @@ func TestNewClientValidation(t *testing.T) {
 		t.Error("expected error for empty model")
 	}
 }
+
+func TestKeepAliveIsSent(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_ = json.NewEncoder(w).Encode(chatResponse{Message: Message{Role: "assistant", Content: `{"title":"x"}`}, Done: true})
+	}))
+	defer srv.Close()
+	c, _ := NewClient(srv.URL, "qwen3:14b", 5*time.Second)
+	var out sample
+	_ = c.WithKeepAlive("30s").GenerateJSON(context.Background(), Request{Messages: []Message{{Role: "user", Content: "hi"}}, Schema: json.RawMessage(`{"type":"object"}`)}, &out)
+	if got["keep_alive"] != "30s" {
+		t.Errorf("keep_alive = %v", got["keep_alive"])
+	}
+	plain, _ := NewClient(srv.URL, "qwen3:4b", 5*time.Second)
+	_ = plain.GenerateJSON(context.Background(), Request{Messages: []Message{{Role: "user", Content: "hi"}}, Schema: json.RawMessage(`{"type":"object"}`)}, &out)
+	if _, ok := got["keep_alive"]; ok {
+		t.Error("keep_alive must be omitted by default")
+	}
+}

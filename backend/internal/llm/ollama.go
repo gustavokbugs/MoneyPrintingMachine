@@ -46,6 +46,7 @@ type Client struct {
 	model      string
 	httpClient *http.Client
 	contextLen int
+	keepAlive  string // how long Ollama keeps the model loaded ("" = its default)
 }
 
 // DefaultContextTokens is the context window requested from the model.
@@ -69,6 +70,14 @@ func NewClient(baseURL, model string, timeout time.Duration) (*Client, error) {
 	}, nil
 }
 
+// WithKeepAlive sets how long Ollama keeps the model in memory after a
+// call (for example "30s"). A large model that is used rarely should be
+// unloaded quickly so renders have memory.
+func (c *Client) WithKeepAlive(d string) *Client {
+	c.keepAlive = d
+	return c
+}
+
 // WithContextTokens sets the context window. Smaller windows use less GPU
 // memory but can truncate long outputs.
 func (c *Client) WithContextTokens(n int) *Client {
@@ -82,12 +91,13 @@ func (c *Client) WithContextTokens(n int) *Client {
 func (c *Client) Model() string { return c.model }
 
 type chatRequest struct {
-	Model    string          `json:"model"`
-	Messages []Message       `json:"messages"`
-	Stream   bool            `json:"stream"`
-	Format   json.RawMessage `json:"format,omitempty"`
-	Think    bool            `json:"think"`
-	Options  map[string]any  `json:"options,omitempty"`
+	Model     string          `json:"model"`
+	Messages  []Message       `json:"messages"`
+	Stream    bool            `json:"stream"`
+	Format    json.RawMessage `json:"format,omitempty"`
+	Think     bool            `json:"think"`
+	KeepAlive string          `json:"keep_alive,omitempty"`
+	Options   map[string]any  `json:"options,omitempty"`
 }
 
 type chatResponse struct {
@@ -107,11 +117,12 @@ func (c *Client) GenerateJSON(ctx context.Context, req Request, out any) error {
 		maxTokens = 2048
 	}
 	body, err := json.Marshal(chatRequest{
-		Model:    c.model,
-		Messages: req.Messages,
-		Stream:   false,
-		Format:   req.Schema,
-		Think:    false,
+		Model:     c.model,
+		Messages:  req.Messages,
+		Stream:    false,
+		Format:    req.Schema,
+		Think:     false,
+		KeepAlive: c.keepAlive,
 		Options: map[string]any{
 			"temperature": req.Temperature,
 			"num_ctx":     c.contextLen,

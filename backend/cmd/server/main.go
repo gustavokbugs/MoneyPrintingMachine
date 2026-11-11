@@ -85,7 +85,9 @@ func run(log *slog.Logger) error {
 		if writer, err = llm.NewClient(cfg.OllamaURL, cfg.ScriptModel, cfg.LLMTimeout); err != nil {
 			return err
 		}
-		writer.WithContextTokens(cfg.LLMContextTokens)
+		// The script model is big and used rarely: unload it soon after a
+		// script so renders have the memory.
+		writer.WithContextTokens(cfg.LLMContextTokens).WithKeepAlive("30s")
 		log.Info("script model", "model", cfg.ScriptModel)
 	}
 
