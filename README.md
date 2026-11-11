@@ -101,7 +101,8 @@ Scopes requested: `youtube.readonly`, `youtube.upload`, `yt-analytics.readonly`.
 | `DATABASE_URL` | PostgreSQL connection string | required |
 | `HTTP_ADDR` | API listen address | `127.0.0.1:8080` |
 | `OLLAMA_URL` | Local Ollama server | `http://127.0.0.1:11434` |
-| `OLLAMA_MODEL` | Model for all generation | `qwen3:4b` |
+| `OLLAMA_MODEL` | Model for channel setup, planning, and anything else | `qwen3:4b` |
+| `OLLAMA_SCRIPT_MODEL` | Model that writes video scripts; a bigger one (for example `qwen3:14b`, about 9 GB of RAM) writes better, slower | same as `OLLAMA_MODEL` |
 | `LLM_TIMEOUT` | Limit per model call | `10m` |
 | `WORKER_CONCURRENCY` | Parallel background jobs | `1` |
 | `LOCAL_OWNER_ID` | Single local operator ID | `local` |
