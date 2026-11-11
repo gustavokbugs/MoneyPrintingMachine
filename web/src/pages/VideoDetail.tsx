@@ -145,6 +145,25 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
           </Button>
         }
       >
+        {/* The style comes first: the 3D build style shapes how the script is written. */}
+        <div className="stack-sm">
+          <div className="row wrap">
+            <label htmlFor="visual-style" className="label">
+              {t("video.style")}
+            </label>
+            <select id="visual-style" value={v.visualStyle} disabled={busy || style.isPending} onChange={(e) => {
+                const next = (tools?.styles ?? []).find((o) => o === e.target.value);
+                if (next) style.mutate(next);
+              }}>
+              {(tools?.styles ?? ["auto"]).map((o) => (
+                <option key={o} value={o}>
+                  {t(`video.style.${o}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="xs muted">{t(`video.styleHelp.${v.visualStyle}`)}</p>
+        </div>
         <StoryFormatControls video={v} tools={tools} disabled={busy} onSaved={setVideo} />
         <DialogueControls video={v} tools={tools} disabled={busy} onSaved={setVideo} />
         {scriptJob.jobId && <JobProgress job={scriptJob.job.data} error={scriptJob.job.error} />}
@@ -206,24 +225,10 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
                 </option>
               ))}
             </select>
-            <label htmlFor="visual-style" className="label">
-              {t("video.style")}
-            </label>
-            <select id="visual-style" value={v.visualStyle} disabled={busy || style.isPending} onChange={(e) => {
-                const next = (tools?.styles ?? []).find((o) => o === e.target.value);
-                if (next) style.mutate(next);
-              }}>
-              {(tools?.styles ?? ["auto"]).map((o) => (
-                <option key={o} value={o}>
-                  {t(`video.style.${o}`)}
-                </option>
-              ))}
-            </select>
             <Button variant="primary" icon={Film} loading={produceJob.running || v.status === "producing"} disabled={!canProduce || busy} onClick={produceJob.run}>
               {v.output ? t("video.reproduce") : t("video.produce")}
             </Button>
           </div>
-          <p className="xs muted">{t(`video.styleHelp.${v.visualStyle}`)}</p>
           {v.visualStyle === "footage" && tools && !tools.stockFootage && <Notice tone="info">{t("video.footageNoKey")}</Notice>}
           {produceJob.jobId && <JobProgress job={produceJob.job.data} error={produceJob.job.error} />}
           {v.output && (

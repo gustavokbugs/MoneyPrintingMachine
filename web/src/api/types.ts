@@ -424,7 +424,7 @@ export interface DialogueModeInfo {
 }
 
 /** Visual styles the scene renderer supports; keep in sync with production.Styles. */
-export const visualStyles = ["auto", "minimal", "documentary", "bold", "tech", "gameplay", "footage"] as const;
+export const visualStyles = ["auto", "minimal", "documentary", "bold", "tech", "gameplay", "footage", "build3d"] as const;
 export type VisualStyle = (typeof visualStyles)[number];
 
 export type Privacy = "private" | "unlisted" | "public";
