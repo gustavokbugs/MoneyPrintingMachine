@@ -342,6 +342,9 @@ func (s *Service) handleProduce(ctx context.Context, j jobs.Job) (any, error) {
 	return map[string]any{"videoId": id, "durationSeconds": out.DurationSeconds}, nil
 }
 
+// SegmentGap is the pause between story segments, in seconds.
+const SegmentGap = 0.3
+
 // Produce narrates every segment and renders the final MP4 and SRT.
 func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*Output, error) {
 	if missing := s.tools.Missing(); len(missing) > 0 {
@@ -361,6 +364,12 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	lang, ok := speechLang(ch.Language)
 	if !ok {
 		return nil, &UnsupportedLanguageError{Language: ch.Language}
+	}
+	// Story styles pause briefly between segments, so each stage or
+	// beat lands before the next line starts.
+	gap := 0.0
+	if storyStyle(ResolveStyle(v.VisualStyle, ch.Niche)) {
+		gap = SegmentGap
 	}
 	narrator := Narrator{Tools: tools, Runner: s.runner, CacheDir: filepath.Join(s.mediaDir, "tts-cache"), Pace: paceOf(v.StoryFormat), Lang: lang}
 	lex, err := LoadLexicon(tools.LexiconPath())
@@ -421,6 +430,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		if err != nil {
 			return nil, fmt.Errorf("measure segment %d: %w", i+1, err)
 		}
+		d += gap // the pause after the segment belongs to it
 		title := seg.OnScreenText
 		if title == "" {
 			title = seg.Heading
@@ -546,7 +556,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	// Soundtrack: an original music bed and effects synthesized in code.
 	// Formats that want immersion drop the music and lean on effects.
 	mood := MoodFor(resolved)
-	mix := AudioMix{Voice: audios, Music: "music.wav", Effects: "effects.wav"}
+	mix := AudioMix{Voice: audios, Music: "music.wav", Effects: "effects.wav", Gap: gap}
 	music := "Original score generated in code (" + mood.Description + "); no third-party audio."
 	if musicOff(v.StoryFormat) {
 		mix.Music, music = "", "No music; sound effects generated in code."

@@ -114,8 +114,9 @@ func rewriteUsable(out rewriteOutput, ref SceneScript) bool {
 		}
 		seen[n] = true
 	}
-	// A rewrite much shorter than the reference would cut the video short.
-	return total*100 >= refTotal*85
+	// A rewrite much shorter than the reference would cut the video short
+	// (the 14B model tends to trim about 10%).
+	return total*100 >= refTotal*92
 }
 
 // generateSceneScript writes a 3D build script as a fresh rewrite of the

@@ -115,6 +115,10 @@ func TestFFmpegArgsMixesSoundtrack(t *testing.T) {
 			t.Errorf("missing %q in %s", want, joined)
 		}
 	}
+	gapped := strings.Join(FFmpegArgs("v.mp4", AudioMix{Voice: []string{"a.wav", "b.wav"}, Gap: 0.3}, 10, 1080, 1920, "#000000", "", "f", "o.mp4"), " ")
+	if !strings.Contains(gapped, "[1:a]apad=pad_dur=0.300[g0];[2:a]apad=pad_dur=0.300[g1];[g0][g1]concat=n=2") {
+		t.Errorf("segments must be padded before the concat: %s", gapped)
+	}
 	voiceOnly := strings.Join(FFmpegArgs("", AudioMix{Voice: []string{"a.wav"}}, 3, 1080, 1920, "#000000", "c.ass", "f", "o.mp4"), " ")
 	if strings.Contains(voiceOnly, "sidechain") || !strings.Contains(voiceOnly, "[voice];[voice]amix=inputs=1") {
 		t.Fatalf("voice-only mix: %s", voiceOnly)

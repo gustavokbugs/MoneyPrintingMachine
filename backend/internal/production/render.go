@@ -247,8 +247,18 @@ func FFmpegArgs(visual string, mix AudioMix, total float64, width, height int, b
 		sfxIn = next
 	}
 	var fc strings.Builder
-	for i := range mix.Voice {
-		fmt.Fprintf(&fc, "[%d:a]", i+1)
+	if mix.Gap > 0 {
+		// A short pause after every segment lets each beat land.
+		for i := range mix.Voice {
+			fmt.Fprintf(&fc, "[%d:a]apad=pad_dur=%s[g%d];", i+1, strconv.FormatFloat(mix.Gap, 'f', 3, 64), i)
+		}
+		for i := range mix.Voice {
+			fmt.Fprintf(&fc, "[g%d]", i)
+		}
+	} else {
+		for i := range mix.Voice {
+			fmt.Fprintf(&fc, "[%d:a]", i+1)
+		}
 	}
 	// Voice: concatenate, upsample, remove rumble, and even out dynamics.
 	fmt.Fprintf(&fc, "concat=n=%d:v=0:a=1,aresample=%d,aformat=channel_layouts=stereo,highpass=f=70,"+
@@ -289,6 +299,9 @@ type AudioMix struct {
 	Effects string
 	// MusicGain scales the music bed before ducking (default 0.30).
 	MusicGain float64
+	// Gap is silence added after each voice segment, in seconds; segment
+	// durations must include it so pictures stay in sync.
+	Gap float64
 }
 
 func (m AudioMix) musicGain() float64 {
