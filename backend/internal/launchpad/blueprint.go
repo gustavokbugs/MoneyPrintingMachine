@@ -13,7 +13,10 @@ import (
 
 // Blueprint targets from the Launchpad specification.
 const (
-	targetIdeas          = 30
+	targetIdeas = 30
+	// minIdeas is accepted when the model runs out of distinct ideas before
+	// the target: a smaller plan beats failing a long job after many calls.
+	minIdeas             = 12
 	targetPriorityTopics = 10
 	targetSeries         = 5
 	targetFormats        = 3
@@ -209,7 +212,7 @@ Explain what makes each idea original instead of a rehash of popular videos.
 			}
 		}
 	}
-	if len(ideas) < targetIdeas {
+	if len(ideas) < minIdeas {
 		return nil, fmt.Errorf("%w: only %d sufficiently distinct ideas after %d batches", llm.ErrInvalidOutput, len(ideas), maxIdeaBatches)
 	}
 	return ideas, nil

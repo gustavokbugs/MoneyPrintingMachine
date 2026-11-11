@@ -469,3 +469,41 @@ func (f *fakeStore) UpdateSettings(_ context.Context, _, _ string, u channel.Set
 	}
 	return f.ch, nil
 }
+
+func TestGenerateBlueprintAcceptsAPartialPlan(t *testing.T) {
+	plan := map[string]any{
+		"priorityTopics": []string{"t1", "t2", "t3"},
+		"series":         []any{map[string]any{"name": "s1", "description": "d", "cadence": "weekly"}},
+		"formats":        []any{map[string]any{"name": "Short", "description": "d", "aspectRatio": "9:16", "durationSeconds": 45}},
+		"hooks":          []string{"h1"},
+	}
+	// Each batch adds 4 new ideas and repeats the rest: 20 after 5 batches,
+	// below the target of 30 but above the minimum.
+	next := 0
+	g := &scriptedGen{respond: func(call int, _ llm.Request) string {
+		if call == 1 {
+			return mustJSON(t, plan)
+		}
+		ideas := make([]any, 0, 10)
+		for k := range 10 {
+			w := ideaWords[0]
+			if k < 4 {
+				w = ideaWords[next%len(ideaWords)]
+				next++
+			}
+			ideas = append(ideas, map[string]any{
+				"topic": w + " mission", "workingTitle": "The " + w + " Story", "targetAudience": "a",
+				"angle": "a", "whyInteresting": "w", "researchSources": []string{"archives"},
+				"originalityNotes": "o", "suggestedDurationSeconds": 60, "format": "Short",
+			})
+		}
+		return mustJSON(t, map[string]any{"ideas": ideas})
+	}}
+	bp, err := fixedEngine(g).GenerateBlueprint(context.Background(), strategyFixture())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if n := len(bp.Ideas); n < minIdeas || n >= targetIdeas {
+		t.Fatalf("ideas = %d, want a partial plan between %d and %d", n, minIdeas, targetIdeas)
+	}
+}
