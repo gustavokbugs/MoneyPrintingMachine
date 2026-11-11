@@ -75,15 +75,36 @@
     tx.repeat.set(repeatX || 1, repeatY || 1);
     return tx;
   }
-  const stoneTex = canvasTexture(256, (x, n) => {
-    x.fillStyle = "#4a453f"; x.fillRect(0, 0, n, n);
-    for (let r = 0; r < 8; r++) for (let k = 0; k < 5; k++) {
-      const s = 0.8 + rand() * 0.35;
-      x.fillStyle = `rgb(${150 * s | 0},${140 * s | 0},${126 * s | 0})`;
-      const w = 46 + rand() * 6;
-      x.fillRect(((k * 52 + (r % 2) * 26) % n) + 2, r * 32 + 2, w, 28);
+  const stoneTex = canvasTexture(512, (x, n) => {
+    x.fillStyle = "#3a3631"; x.fillRect(0, 0, n, n);
+    let y = 0;
+    while (y < n) {
+      const h = 34 + rand() * 22;
+      let xx = -rand() * 40;
+      while (xx < n) {
+        const w = 50 + rand() * 60, s = 0.75 + rand() * 0.4;
+        x.fillStyle = `rgb(${138 * s | 0},${128 * s | 0},${112 * s | 0})`;
+        x.fillRect(xx + 3, y + 3, w - 6, h - 6);
+        x.fillStyle = "rgba(255,255,255,0.08)"; x.fillRect(xx + 3, y + 3, w - 6, 4);
+        x.fillStyle = "rgba(0,0,0,0.12)"; x.fillRect(xx + 3, y + h - 7, w - 6, 4);
+        xx += w;
+      }
+      y += h;
     }
-  }, 3, 1);
+  }, 1, 1);
+  // worldUV maps a texture by world size (1 tile = tile units) on every
+  // face, so blocks keep their size instead of stretching into planks.
+  function worldUV(geo, tile) {
+    const pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv;
+    for (let i = 0; i < pos.count; i++) {
+      const ax = Math.abs(nor.getX(i)), ay = Math.abs(nor.getY(i));
+      const u = ax > 0.5 ? pos.getZ(i) : pos.getX(i);
+      const v2 = ay > 0.5 ? pos.getZ(i) : pos.getY(i);
+      uv.setXY(i, u / tile, v2 / tile);
+    }
+    uv.needsUpdate = true;
+    return geo;
+  }
   const foamTex = canvasTexture(128, (x, n) => {
     x.fillStyle = "rgba(255,255,255,0.0)"; x.clearRect(0, 0, n, n);
     for (let i = 0; i < 90; i++) {
@@ -200,8 +221,12 @@
     cpos.setXYZ(i, u * 1.8, 0.6 - u * u * 2.2, cpos.getY(i));
   }
   curtainGeo.computeVertexNormals();
-  const curtainMat = new THREE.MeshStandardMaterial({ color: "#e8f9ff", emissive: "#7fc8de", emissiveIntensity: 0.6, map: foamTex, transparent: true, opacity: 0.0, roughness: 0.3, side: THREE.DoubleSide });
-  const curtain = new THREE.Mesh(curtainGeo, curtainMat);
+  const curtainMat = new THREE.MeshStandardMaterial({ color: "#f4fdff", emissive: "#bfe9f5", emissiveIntensity: 0.55, map: foamTex, alphaMap: null, transparent: true, opacity: 0.0, roughness: 0.25, side: THREE.DoubleSide });
+  const curtainBody = new THREE.MeshStandardMaterial({ color: "#8fd6ea", emissive: "#3a8fae", emissiveIntensity: 0.4, transparent: true, opacity: 0.0, roughness: 0.2, side: THREE.DoubleSide });
+  // Two layers: a solid blue-white body and bright foam streaks over it.
+  const curtain = new THREE.Group();
+  curtain.add(new THREE.Mesh(curtainGeo, curtainBody));
+  const foamLayer = new THREE.Mesh(curtainGeo, curtainMat); foamLayer.position.x = 0.03; curtain.add(foamLayer);
   curtain.position.set(0.4, 0, 0);
   scene.add(curtain);
 
@@ -211,7 +236,7 @@
   const damLayers = [];
   for (let l = 0; l < LAYERS; l++) {
     const h = 0.48, bottomW = 3.4 - l * 0.38;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(bottomW, h, DAM_W - l * 0.2), damMat);
+    const m = new THREE.Mesh(worldUV(new THREE.BoxGeometry(bottomW, h, DAM_W - l * 0.2), 3.2), damMat);
     m.castShadow = true; m.receiveShadow = true;
     m.userData = { y: -1.75 + h / 2 + l * h, delay: l * 0.32 };
     scene.add(m); damLayers.push(m);
@@ -262,8 +287,12 @@
   const house = new THREE.Group();
   const walls = new THREE.Mesh(new THREE.BoxGeometry(3, 2.2, 2.6), new THREE.MeshStandardMaterial({ color: "#e8dcc4", roughness: 0.9 }));
   walls.position.y = 1.1; walls.castShadow = true; house.add(walls);
-  const roof = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 3.4, 3), new THREE.MeshStandardMaterial({ color: "#a8392a", flatShading: true }));
-  roof.rotation.z = Math.PI / 2; roof.rotation.y = Math.PI / 2; roof.position.y = 2.75; roof.castShadow = true; house.add(roof);
+  const gable = new THREE.Shape();
+  gable.moveTo(-1.85, 0); gable.lineTo(1.85, 0); gable.lineTo(0, 1.5); gable.lineTo(-1.85, 0);
+  const roofGeo = new THREE.ExtrudeGeometry(gable, { depth: 3.0, bevelEnabled: false });
+  roofGeo.translate(0, 0, -1.5);
+  const roof = new THREE.Mesh(roofGeo, new THREE.MeshStandardMaterial({ color: "#a8392a", flatShading: true }));
+  roof.position.y = 2.2; roof.castShadow = true; house.add(roof);
   const windows = [];
   for (const xx of [-0.8, 0.8]) {
     const w = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.05), new THREE.MeshStandardMaterial({ color: "#334", emissive: "#ffd46b", emissiveIntensity: 0 }));
@@ -360,7 +389,8 @@
     });
     // Overflow curtain.
     const over = after(5) && !after(6) ? smooth(p(5, 1.2)) : (after(6) ? 1 - smooth(p(6, 0.8)) : 0);
-    curtain.material.opacity = 0.85 * over;
+    curtainMat.opacity = 0.95 * over;
+    curtainBody.opacity = 0.8 * over;
     curtain.visible = over > 0.01;
     curtain.position.y = up + 0.15;
     curtainMat.map.offset.y = -t * 1.8;
