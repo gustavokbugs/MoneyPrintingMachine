@@ -296,6 +296,13 @@ func TestProduceWithoutToolsIsPermanent(t *testing.T) {
 	}
 }
 
+func TestMediaDirIsAbsolute(t *testing.T) {
+	svc := NewService(&memVideos{items: map[string]Video{}}, fixedChannels{testChannel()}, &scriptedGen{}, Tools{}, nil, filepath.Join("..", ".local", "media"))
+	if !filepath.IsAbs(svc.VideoDir("x")) {
+		t.Fatalf("video dir must be absolute: %s", svc.VideoDir("x"))
+	}
+}
+
 func TestSetVoice(t *testing.T) {
 	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
 	ctx := context.Background()

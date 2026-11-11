@@ -54,6 +54,11 @@ type Service struct {
 
 // NewService builds a Service. mediaDir holds rendered files and the TTS cache.
 func NewService(store Store, channels Channels, gen Generator, tools Tools, runner Runner, mediaDir string) *Service {
+	// External tools run with other working directories, so every path
+	// handed to them must be absolute.
+	if abs, err := filepath.Abs(mediaDir); err == nil {
+		mediaDir = abs
+	}
 	return &Service{store: store, channels: channels, gen: gen, tools: tools, runner: runner, mediaDir: mediaDir, now: time.Now}
 }
 
