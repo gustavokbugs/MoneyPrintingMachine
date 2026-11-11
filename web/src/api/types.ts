@@ -360,6 +360,9 @@ export interface VideoOutput {
   height: number;
   renderedAt: string;
   syntheticVoice: boolean;
+  /** "animated:<style>" or "solid". */
+  visuals?: string;
+  visualsNote?: string;
 }
 
 export interface Video {
@@ -373,6 +376,7 @@ export interface Video {
   status: VideoStatus;
   statusReason: string;
   voiceId: number;
+  visualStyle: VisualStyle;
   script: VideoScript | null;
   output: VideoOutput | null;
   version: number;
@@ -384,4 +388,8 @@ export interface ProductionStatus {
   ready: boolean;
   missing: string[];
   voices: { id: number; name: string }[];
+  styles: VisualStyle[];
+  animatedScenes: boolean;
 }
+
+export type VisualStyle = "auto" | "minimal" | "documentary" | "bold" | "tech";

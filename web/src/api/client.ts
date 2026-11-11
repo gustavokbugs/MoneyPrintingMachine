@@ -26,6 +26,7 @@ import type {
   TrendSnapshot,
   Video,
   VideoScript,
+  VisualStyle,
   Watch,
 } from "./types";
 
@@ -202,6 +203,8 @@ export const api = {
   approveVideo: async (id: string) => asRecordOf<Video>("video", ["id", "status"])(await request("POST", `/api/videos/${encodeURIComponent(id)}/approve`)),
   setVoice: async (id: string, voiceId: number) =>
     asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/voice`, { voiceId })),
+  setVisualStyle: async (id: string, visualStyle: VisualStyle) =>
+    asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/style`, { visualStyle })),
   generateVideoScript: async (id: string, key: string) => asJob(await request("POST", `/api/videos/${encodeURIComponent(id)}/script/generate`, undefined, idem(key))),
   produceVideo: async (id: string, key: string) => asJob(await request("POST", `/api/videos/${encodeURIComponent(id)}/produce`, undefined, idem(key))),
   videoMediaUrl: (id: string, file: "video.mp4" | "captions.srt", version: number) => `/api/videos/${encodeURIComponent(id)}/media/${file}?v=${version}`,

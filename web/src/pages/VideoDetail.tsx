@@ -3,7 +3,7 @@ import { CheckCheck, ChevronRight, CircleCheck, Download, FileText, Film, Rotate
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, newIdempotencyKey } from "../api/client";
-import type { ClaimStatus, Video, VideoScript } from "../api/types";
+import type { ClaimStatus, Video, VideoScript, VisualStyle } from "../api/types";
 import { EditableText } from "../components/EditableText";
 import { useToast } from "../components/feedback";
 import { Badge, Button, Empty, ErrorState, JobProgress, Notice, ProvenanceNote, Section, SkeletonCard, errorMessage } from "../components/ui";
@@ -85,10 +85,11 @@ export function VideoDetail() {
     onError: (err) => toast.error(errorMessage(err)),
   });
   const voice = useMutation({ mutationFn: (vid: number) => api.setVoice(id, vid), onSuccess: setVideo, onError: (err) => toast.error(errorMessage(err)) });
+  const style = useMutation({ mutationFn: (st: VisualStyle) => api.setVisualStyle(id, st), onSuccess: setVideo, onError: (err) => toast.error(errorMessage(err)) });
 
   if (video.isPending) return <SkeletonCard lines={6} />;
   if (video.isError) return <ErrorState error={video.error} onRetry={() => void video.refetch()} />;
-  return <VideoWorkspace video={video.data} tools={status.data} save={save} approve={approve} voice={voice} setVideo={setVideo} />;
+  return <VideoWorkspace video={video.data} tools={status.data} save={save} approve={approve} voice={voice} style={style} setVideo={setVideo} />;
 }
 
 interface WorkspaceProps {
@@ -97,10 +98,11 @@ interface WorkspaceProps {
   save: { mutateAsync: (s: VideoScript) => Promise<Video> };
   approve: { mutate: () => void; isPending: boolean };
   voice: { mutate: (id: number) => void; isPending: boolean };
+  style: { mutate: (s: VisualStyle) => void; isPending: boolean };
   setVideo: (v: Video) => void;
 }
 
-function VideoWorkspace({ video: v, tools, save, approve, voice, setVideo }: WorkspaceProps) {
+function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo }: WorkspaceProps) {
   const scriptJob = useVideoJob(v, (k) => api.generateVideoScript(v.id, k), t("video.scriptDone"));
   const produceJob = useVideoJob(v, (k) => api.produceVideo(v.id, k), t("video.produced"));
   const sc = v.script;
@@ -187,6 +189,7 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, setVideo }: Wor
       {sc && (
         <Section title={t("video.produceTitle")} description={t("video.produceHelp")}>
           {tools && !tools.ready && <Notice tone="warning">{t("video.toolsMissing", { missing: tools.missing.join(", ") })}</Notice>}
+          {tools?.ready && !tools.animatedScenes && <Notice tone="info">{t("video.noAnimation")}</Notice>}
           <div className="row wrap">
             <label htmlFor="voice" className="label">
               {t("video.voice")}
@@ -195,6 +198,19 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, setVideo }: Wor
               {(tools?.voices ?? []).map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.name}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="visual-style" className="label">
+              {t("video.style")}
+            </label>
+            <select id="visual-style" value={v.visualStyle} disabled={busy || style.isPending} onChange={(e) => {
+                const next = (tools?.styles ?? []).find((o) => o === e.target.value);
+                if (next) style.mutate(next);
+              }}>
+              {(tools?.styles ?? ["auto"]).map((o) => (
+                <option key={o} value={o}>
+                  {t(`video.style.${o}`)}
                 </option>
               ))}
             </select>
@@ -215,7 +231,7 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, setVideo }: Wor
                 <track kind="captions" srcLang="en" label="English" />
               </video>
               <p className="xs muted tabular">
-                {t("video.rendered", { duration: formatDuration(Math.round(v.output.durationSeconds)), size: `${v.output.width}×${v.output.height}`, date: formatDateTime(v.output.renderedAt) })}
+                {t("video.rendered", { duration: formatDuration(Math.round(v.output.durationSeconds)), size: `${v.output.width}×${v.output.height}`, visuals: visualsLabel(v.output.visuals), date: formatDateTime(v.output.renderedAt) })}
               </p>
               <div className="row wrap">
                 <a className="btn btn-secondary btn-sm" href={api.videoMediaUrl(v.id, "video.mp4", v.version)} download={`${v.title}.mp4`}>
@@ -227,6 +243,7 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, setVideo }: Wor
                   {t("video.downloadCaptions")}
                 </a>
               </div>
+              {v.output.visualsNote && <Notice tone="warning">{v.output.visualsNote}</Notice>}
               {v.output.syntheticVoice && <Notice tone="info">{t("video.disclosure")}</Notice>}
             </div>
           )}
@@ -234,4 +251,14 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, setVideo }: Wor
       )}
     </>
   );
+}
+
+function visualsLabel(visuals: string | undefined): string {
+  if (visuals?.startsWith("animated:")) {
+    const st = visuals.slice("animated:".length);
+    const known: readonly VisualStyle[] = ["minimal", "documentary", "bold", "tech"];
+    const match = known.find((k) => k === st);
+    return t("video.visuals.animated", { style: match ? t(`video.style.${match}`) : st });
+  }
+  return t("video.visuals.solid");
 }
