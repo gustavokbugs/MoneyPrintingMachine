@@ -2,6 +2,8 @@ package production
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -22,7 +24,12 @@ const (
 	StyleTech        = "tech"
 	StyleGameplay    = "gameplay"
 	StyleFootage     = "footage"
+	StyleBuild3D     = "build3d"
 )
+
+// storyStyle reports whether a style uses the one-word story layout (hook
+// card, centred captions, key-word colors, word sound effects).
+func storyStyle(s string) bool { return s == StyleGameplay || s == StyleBuild3D }
 
 // Styles lists selectable styles with descriptions for the UI.
 var Styles = []struct {
@@ -37,6 +44,7 @@ var Styles = []struct {
 	{StyleTech, "Tech", "Monospace details over a moving grid. Good for science, space, and AI."},
 	{StyleFootage, "Stock footage", "Real clips matched to each part of the script, with one big word at a time: Pexels videos with a free API key, else free-licensed Wikimedia Commons photos."},
 	{StyleGameplay, "Gameplay story", "An original game-style run in the background with one big word at a time in the middle. Good for stories and quick facts."},
+	{StyleBuild3D, "3D build", "A low-poly 3D scene where each step of the story adds a piece, like watching something get built. Good for problem-fix chains and how-it-was-invented stories."},
 }
 
 // ValidStyle reports whether s is a known style.
@@ -340,6 +348,10 @@ type ProjectInput struct {
 	Background string
 	// FollowText is the closing call to action, in the channel's language.
 	FollowText string
+	// Build is the 3D build storyboard (3D build style only).
+	Build *BuildData
+	// ThreeJS is three.js's CommonJS build (renderer/node_modules/three).
+	ThreeJS string
 }
 
 type projectView struct {
@@ -353,6 +365,7 @@ type projectView struct {
 	CaptionData   []captionData
 	PopData       []popData
 	HasBG         bool
+	BuildJSON     template.JS
 }
 
 type popData struct {
@@ -408,7 +421,20 @@ func WriteProject(dir string, in ProjectInput, gsapPath, fontsPkgDir string) err
 		v.CaptionData = append(v.CaptionData, d)
 	}
 	tmpl := projectTemplate
-	if in.Style == StyleGameplay {
+	if in.Style == StyleBuild3D {
+		if in.Build == nil || in.ThreeJS == "" {
+			return errors.New("3D build needs a storyboard and three.js (npm install in renderer/)")
+		}
+		if err := writeBuildAssets(filepath.Join(dir, "assets"), in.ThreeJS); err != nil {
+			return err
+		}
+		raw, err := json.Marshal(in.Build)
+		if err != nil {
+			return err
+		}
+		v.BuildJSON = template.JS(raw) // numbers and names from fixed lists only
+	}
+	if storyStyle(in.Style) {
 		tmpl = storyTemplate
 		if in.Background != "" {
 			if err := copyFile(in.Background, filepath.Join(dir, "assets", "bg.mp4")); err != nil {

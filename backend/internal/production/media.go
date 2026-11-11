@@ -40,8 +40,10 @@ type Tools struct {
 	HyperFrames string
 	// TTSBridge narrates non-English text (renderer/tts.mjs).
 	TTSBridge string
-	GSAP      string
-	WebFonts  string
+	// ThreeJS is three.js's CommonJS build, for the 3D build style.
+	ThreeJS  string
+	GSAP     string
+	WebFonts string
 }
 
 // WithRenderer adds the HyperFrames workspace at dir (the repository's
@@ -58,6 +60,9 @@ func (t Tools) WithRenderer(dir string) Tools {
 	t.HyperFrames = filepath.Join(dir, "node_modules", "hyperframes", "bin", "hyperframes.mjs")
 	t.GSAP = filepath.Join(dir, "node_modules", "gsap", "dist", "gsap.min.js")
 	t.WebFonts = filepath.Join(dir, "node_modules", "@fontsource")
+	if _, err := os.Stat(filepath.Join(dir, "node_modules", "three", "build", "three.cjs")); err == nil {
+		t.ThreeJS = filepath.Join(dir, "node_modules", "three", "build", "three.cjs")
+	}
 	if _, err := os.Stat(filepath.Join(dir, "node_modules", "sherpa-onnx-node")); err == nil {
 		t.TTSBridge = filepath.Join(dir, "tts.mjs")
 	}

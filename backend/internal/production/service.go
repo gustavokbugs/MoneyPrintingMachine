@@ -474,14 +474,19 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		}
 	}
 	captions := captionsFor(resolved, segs, width, height)
-	if resolved == StyleGameplay && s.tools.AnimatedScenes() {
+	var build *BuildData
+	if resolved == StyleBuild3D && s.tools.AnimatedScenes() {
+		build = s.planBuild(rctx, segs, seedOf(v.ID))
+	}
+	if storyStyle(resolved) && s.tools.AnimatedScenes() {
 		// Key words: a photo pops up on each fix word, and captions color
 		// fixes yellow and problems red. The story renders without them.
 		plans := s.planPops(rctx, segs)
 		wordFX = PlanWordEffects(segs)
 		fixes, problems := captionMarks(segs, plans)
 		captions = MarkCaptions(captions, fixes, problems)
-		if s.FootageAvailable() {
+		if resolved == StyleGameplay && s.FootageAvailable() {
+			// The 3D build shows its pieces instead of photos.
 			if pops, err = s.planImagePops(rctx, segs, plans, wordFX, width, height); err != nil {
 				note = strings.TrimSpace(note + " Pop-up images were skipped: " + truncateErr(err, 200))
 			}
@@ -493,6 +498,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
 			ChannelName: ch.Name, Scenes: scenes, Captions: captions, Seed: seedOf(v.ID),
 			Pops: pops, HookText: hookText(segs), Background: background, FollowText: followText(ch.Language, ch.Name),
+			Build: build, ThreeJS: s.tools.ThreeJS,
 		})
 		if err != nil {
 			visual, note = "", "Animated scenes failed, so a plain background was used: "+truncateErr(err, 300)
@@ -529,7 +535,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		return nil, fmt.Errorf("compose music: %w", err)
 	}
 	effects := PlanEffects(scenes, resolved)
-	if resolved == StyleGameplay {
+	if storyStyle(resolved) {
 		// Sounds on the words that name them ("burning" sizzles).
 		effects = append(effects, wordFX...)
 	}
@@ -576,7 +582,7 @@ func hookText(segs []Timed) string {
 // captionsFor picks the caption layout: one word at a time for the
 // gameplay story, short lines with a highlighted word otherwise.
 func captionsFor(style string, segs []Timed, width, height int) []CaptionChunk {
-	if style == StyleGameplay {
+	if storyStyle(style) {
 		return WordCaptions(segs)
 	}
 	return CaptionTrack(segs, captionWords(width, height))

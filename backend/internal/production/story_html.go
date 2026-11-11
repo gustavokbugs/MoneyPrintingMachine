@@ -54,7 +54,9 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
 </head>
 <body>
 <div id="root" data-composition-id="main" data-start="0" data-duration="{{sec .Total}}" data-width="{{.Width}}" data-height="{{.Height}}">
-{{if .HasBG}}  <video id="bgv" class="clip" src="assets/bg.mp4" muted playsinline data-start="0" data-duration="{{sec .Total}}" data-track-index="0"
+{{if .BuildJSON}}  <canvas id="gl3d" class="clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="0" width="{{.Width}}" height="{{.Height}}"
+    style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+{{else if .HasBG}}  <video id="bgv" class="clip" src="assets/bg.mp4" muted playsinline data-start="0" data-duration="{{sec .Total}}" data-track-index="0"
     style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>
 {{else}}  <div class="bg clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="0">
     <canvas id="game" width="{{.Width}}" height="{{.Height}}"></canvas>
@@ -75,7 +77,10 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
     <div class="progress"><div class="progress-fill"></div></div>
   </div>
 </div>
-<script>
+{{if .BuildJSON}}<script>window.BUILD = {{.BuildJSON}};</script>
+<script src="assets/three.js"></script>
+<script src="assets/build3d.js"></script>
+{{end}}<script>
 (function () {
   var CAPS = {{.CaptionData}};
   var POPS = {{.PopData}} || [];
@@ -263,6 +268,12 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
   if (g) {
     draw(0);
     tl.to(clock, { t: TOTAL, duration: TOTAL, ease: "none", onUpdate: function () { draw(clock.t); } }, 0);
+  }
+  // The 3D build style draws its own scene (build3d.js).
+  if (window.Build3D) {
+    var clock3 = { t: 0 };
+    window.Build3D.draw(0);
+    tl.to(clock3, { t: TOTAL, duration: TOTAL, ease: "none", onUpdate: function () { window.Build3D.draw(clock3.t); } }, 0);
   }
   tl.to(".progress-fill", { scaleX: 1, duration: TOTAL, ease: "none" }, 0);
 

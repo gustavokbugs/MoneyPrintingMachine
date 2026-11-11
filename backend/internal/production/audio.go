@@ -158,6 +158,9 @@ var moods = map[string]Mood{
 
 // MoodFor returns the music mood matching a resolved visual style.
 func MoodFor(style string) Mood {
+	if style == StyleBuild3D {
+		style = StyleGameplay // the same laid-back bed
+	}
 	if m, ok := moods[style]; ok {
 		return m
 	}
@@ -432,7 +435,7 @@ func PlanEffects(scenes []Scene, style string) []SFXCue {
 		}
 		return cues
 	}
-	if style == StyleGameplay {
+	if storyStyle(style) {
 		if len(scenes) == 0 {
 			return nil
 		}
