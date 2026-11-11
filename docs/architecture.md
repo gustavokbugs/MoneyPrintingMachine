@@ -55,6 +55,8 @@ Dependencies point inward: `channel` knows nothing about HTTP, SQL, or models; a
 | Parakeet TDT 110M word-timing model (NVIDIA, sherpa-onnx int8 export) | CC-BY-4.0 (credit NVIDIA; used only to time captions, nothing is redistributed) |
 | Pexels videos (optional, via the official API) | Pexels License: free commercial use; the API guidelines ask for credit to Pexels and creators (added to descriptions) |
 | Wikimedia Commons photos | Only public domain, CC0, CC BY, and CC BY-SA files are used; author, license, and link are credited in descriptions (attribution required for CC BY/BY-SA; BY-SA also applies share-alike to adaptations of the image) |
+| sherpa-onnx-node (Node TTS bridge for non-English narration) | Apache-2.0 |
+| espeak-ng (WebAssembly, `espeak-ng` npm package) | GPL-3.0-or-later. Used only as a separate local process (`renderer/phonemes.mjs`) to turn Brazilian Portuguese text into phonemes; it is not linked into or shipped with the app |
 | Music and sound effects | Generated in code (`internal/production/audio.go`); original, no third-party audio |
 | HyperFrames 0.8.209 | Apache 2.0; telemetry disabled through environment variables |
 | GSAP 3.15.0 | GSAP Standard No-Charge License (free, including commercial use; may not be used in a tool that competes with Webflow) |
