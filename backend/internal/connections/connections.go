@@ -407,3 +407,35 @@ func (s *Service) verifyWithToken(ctx context.Context, rec *Record, tok youtube.
 	v := rec.View()
 	return &v, nil
 }
+
+// ErrNotPublishable means the channel has no verified YouTube connection
+// with upload permission.
+var ErrNotPublishable = errors.New("connect and verify a YouTube account with upload permission first")
+
+// AccessToken returns a fresh access token for publishing to the channel's
+// verified YouTube account, refreshing and persisting it when needed.
+func (s *Service) AccessToken(ctx context.Context, ownerID, channelID string) (string, error) {
+	if !s.Configured() {
+		return "", youtube.ErrNotConfigured
+	}
+	rec, err := s.store.Get(ctx, ownerID, channelID, PlatformYouTube)
+	if err != nil {
+		return "", fmt.Errorf("load connection: %w", err)
+	}
+	if rec == nil || rec.Status != StatusVerified || !rec.CanPublish || len(rec.RefreshTokenEnc) == 0 {
+		return "", ErrNotPublishable
+	}
+	tok, err := s.currentToken(ctx, rec)
+	if errors.Is(err, youtube.ErrInvalidGrant) {
+		s.markRevoked(rec)
+		_ = s.store.Upsert(ctx, rec)
+		return "", ErrNotPublishable
+	}
+	if err != nil {
+		return "", err
+	}
+	if err := s.store.Upsert(ctx, rec); err != nil {
+		return "", fmt.Errorf("save refreshed token: %w", err)
+	}
+	return tok.AccessToken, nil
+}

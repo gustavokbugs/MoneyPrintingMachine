@@ -320,3 +320,27 @@ func TestStartGuards(t *testing.T) {
 		t.Fatalf("no encryption key: %v", err)
 	}
 }
+
+func TestAccessToken(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	if _, err := f.svc.AccessToken(ctx, "alice", "ch1"); !errors.Is(err, ErrNotPublishable) {
+		t.Fatalf("no connection: %v", err)
+	}
+	u, _ := f.svc.Start(ctx, "alice", "ch1")
+	if _, err := f.svc.Callback(ctx, "alice", stateFrom(t, u), "good", ""); err != nil {
+		t.Fatal(err)
+	}
+	tok, err := f.svc.AccessToken(ctx, "alice", "ch1")
+	if err != nil || tok != "at" {
+		t.Fatalf("token = %q %v", tok, err)
+	}
+	f.clock = f.clock.Add(3 * time.Hour)
+	f.oauth.refreshed = youtube.Token{AccessToken: "at3", Expiry: f.clock.Add(time.Hour)}
+	if tok, err := f.svc.AccessToken(ctx, "alice", "ch1"); err != nil || tok != "at3" {
+		t.Fatalf("refreshed token = %q %v", tok, err)
+	}
+	if _, err := f.svc.AccessToken(ctx, "bob", "ch1"); !errors.Is(err, ErrNotPublishable) {
+		t.Fatalf("other owner: %v", err)
+	}
+}
