@@ -409,6 +409,9 @@ const (
 type SFXCue struct {
 	At   float64
 	Kind string
+	// Word is the spoken word that triggered a word effect ("" for scene
+	// effects); its pop-up picture is searched from it.
+	Word string
 }
 
 // PlanEffects places effects on scene changes: an impact on the opening

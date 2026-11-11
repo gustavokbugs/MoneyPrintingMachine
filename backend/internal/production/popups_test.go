@@ -40,18 +40,36 @@ func TestKeywordTime(t *testing.T) {
 	}
 }
 
-func TestPopTimesAvoidOverlap(t *testing.T) {
+func TestPopMomentsAvoidOverlap(t *testing.T) {
 	segs := []Timed{{Duration: 2, Text: "a b c d"}, {Duration: 0.6, Text: "x"}, {Duration: 3, Text: "y"}}
-	times := popTimes(segs, []popPlan{{Keyword: "a"}, {Keyword: "x"}, {Keyword: "y"}})
+	got := popMoments(segs, []popPlan{{Keyword: "a", Query: "qa"}, {Keyword: "x", Query: "qx"}, {Keyword: "y", Query: "qy"}}, nil)
 	// Pop 2 starts 0.6 s before pop 3, so trimming leaves it too short.
-	if times[0] != [2]float64{0, popSeconds} {
-		t.Errorf("pop 1 = %v", times[0])
+	if len(got) != 2 || got[0].Query != "qa" || got[0].End != popSeconds || got[1].Query != "qy" {
+		t.Fatalf("moments = %+v", got)
 	}
-	if times[1][0] != -1 {
-		t.Errorf("pop 2 should be dropped, got %v", times[1])
+}
+
+func TestEverySoundGetsAPicture(t *testing.T) {
+	segs := []Timed{{Duration: 4, Text: "Your house is burning down fast"}, {Duration: 4, Text: "then it explodes"}}
+	plans := []popPlan{{Keyword: "house", Query: "house"}, {Keyword: "then", Query: "then"}}
+	sounds := []SFXCue{{At: 0.05, Kind: SFXImpact}, {At: 2, Kind: SFXFire, Word: "burning"}, {At: 6.5, Kind: SFXImpact, Word: "explodes"}}
+	got := popMoments(segs, plans, sounds)
+	// Scene effects (no word) get no picture; "house" (estimated at
+	// 0.67 s) stays, "then" at 4 s is far enough from the explosion too.
+	var queries []string
+	for _, m := range got {
+		queries = append(queries, m.Query)
 	}
-	if d := times[2][1] - times[2][0]; d < popSeconds-1e-9 || d > popSeconds+1e-9 {
-		t.Errorf("pop 3 = %v", times[2])
+	if strings.Join(queries, ",") != "house,fire flames,then,explosion" {
+		t.Fatalf("queries = %v", queries)
+	}
+	// A key word within a second of a sound loses to the sound.
+	got = popMoments(segs, []popPlan{{Keyword: "burning", Query: "house"}, {}}, sounds)
+	if len(got) != 2 || got[0].Query != "fire flames" {
+		t.Fatalf("near moments = %+v", got)
+	}
+	if q := sfxQuery(SFXCue{Kind: SFXHiss, Word: "melted"}); q != "melted" {
+		t.Errorf("hiss query = %q", q)
 	}
 }
 
@@ -71,7 +89,7 @@ func TestPlanImagePops(t *testing.T) {
 	if plans[0].Problem != "prank" || plans[1].Problem != "" || plans[1].Keyword != "congrats" {
 		t.Errorf("plans = %+v (problem words must come from the text)", plans)
 	}
-	pops, err := svc.planImagePops(context.Background(), segs, plans, 1080, 1920)
+	pops, err := svc.planImagePops(context.Background(), segs, plans, nil, 1080, 1920)
 	if err != nil || len(pops) != 2 {
 		t.Fatalf("pops=%+v err=%v", pops, err)
 	}
@@ -91,11 +109,11 @@ func TestPlanImagePops(t *testing.T) {
 
 	// A provider error with nothing found is reported; no searcher, no pops.
 	f.err = fmt.Errorf("search: %w", stock.ErrRateLimited)
-	if _, err := svc.planImagePops(context.Background(), segs, plans, 1080, 1920); !errors.Is(err, stock.ErrRateLimited) {
+	if _, err := svc.planImagePops(context.Background(), segs, plans, nil, 1080, 1920); !errors.Is(err, stock.ErrRateLimited) {
 		t.Errorf("err = %v", err)
 	}
 	svc.WithFootage(&fakeFootage{})
-	if pops, err := svc.planImagePops(context.Background(), segs, plans, 1080, 1920); pops != nil || err != nil {
+	if pops, err := svc.planImagePops(context.Background(), segs, plans, nil, 1080, 1920); pops != nil || err != nil {
 		t.Errorf("without image search: %v %v", pops, err)
 	}
 }

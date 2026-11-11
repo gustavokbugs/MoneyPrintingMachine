@@ -93,12 +93,31 @@ func PlanWordEffects(segs []Timed) []SFXCue {
 			if t, ok := last[kind]; ok && at-t < sameEffectGap {
 				continue
 			}
-			cues = append(cues, SFXCue{At: at, Kind: kind})
+			cues = append(cues, SFXCue{At: at, Kind: kind, Word: normWord(w)})
 			last[kind], prev = at, at
 		}
 		offset += seg.Duration
 	}
 	return cues
+}
+
+// soundQueries are photo searches that show what a sound effect is; the
+// kinds left out search the spoken word itself ("melted", "running").
+var soundQueries = map[string]string{
+	SFXFire: "fire flames", SFXSplash: "water splash", SFXKnock: "wooden door", SFXZap: "electric sparks",
+	SFXShatter: "broken glass", SFXImpact: "explosion", SFXHeartbeat: "human heart", SFXWind: "snowstorm",
+	SFXClock: "clock", SFXPop: "popcorn",
+}
+
+// sfxQuery is the photo search for a word effect's pop-up picture.
+func sfxQuery(c SFXCue) string {
+	if c.Word == "" {
+		return ""
+	}
+	if q, ok := soundQueries[c.Kind]; ok {
+		return q
+	}
+	return c.Word
 }
 
 // renderWordEffect synthesizes one word effect; it reports false for kinds

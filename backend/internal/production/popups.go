@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"contentfactory/internal/llm"
@@ -131,25 +133,53 @@ func keywordTime(seg Timed, keyword string) float64 {
 	}
 }
 
-// popTimes places one pop per segment on its key word, shortening a pop
-// so it never overlaps the next and dropping pops too short to read.
-func popTimes(segs []Timed, plans []popPlan) [][2]float64 {
-	times := make([][2]float64, len(segs))
+// popMoment is when a picture pops up and what it shows.
+type popMoment struct {
+	Start, End float64
+	Query      string
+}
+
+// popMoments places pictures on each segment's key word and on every word
+// sound effect, so no sound plays without a picture. A sound's picture
+// wins over a key-word picture less than a second away; each picture is
+// cut short before the next one, and pictures too short to read are
+// dropped.
+func popMoments(segs []Timed, plans []popPlan, sounds []SFXCue) []popMoment {
+	var keys, out []popMoment
 	offset := 0.0
 	for i, seg := range segs {
-		start := offset + keywordTime(seg, plans[i].Keyword)
-		times[i] = [2]float64{start, start + popSeconds}
+		if i < len(plans) && plans[i].Query != "" {
+			keys = append(keys, popMoment{Start: offset + keywordTime(seg, plans[i].Keyword), Query: plans[i].Query})
+		}
 		offset += seg.Duration
 	}
-	for i := range times {
-		if i+1 < len(times) && times[i][1] > times[i+1][0]-0.05 {
-			times[i][1] = times[i+1][0] - 0.05
-		}
-		if times[i][1]-times[i][0] < popMinSeconds {
-			times[i] = [2]float64{-1, -1} // skipped
+	var all []popMoment
+	for _, c := range sounds {
+		if q := sfxQuery(c); q != "" {
+			all = append(all, popMoment{Start: c.At, Query: q})
 		}
 	}
-	return times
+	nSounds := len(all)
+	for _, k := range keys {
+		near := false
+		for _, m := range all[:nSounds] {
+			near = near || math.Abs(m.Start-k.Start) < 1
+		}
+		if !near {
+			all = append(all, k)
+		}
+	}
+	sort.SliceStable(all, func(i, j int) bool { return all[i].Start < all[j].Start })
+	for i, m := range all {
+		m.End = m.Start + popSeconds
+		if i+1 < len(all) {
+			m.End = math.Min(m.End, all[i+1].Start-0.05)
+		}
+		if m.End-m.Start >= popMinSeconds {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // captionMarks returns when each segment's fix and problem words are
@@ -170,25 +200,21 @@ func captionMarks(segs []Timed, plans []popPlan) (fixes, problems []float64) {
 	return fixes, problems
 }
 
-// planImagePops finds and downloads one photo per segment. Pops are
+// planImagePops finds and downloads a photo for every pop moment. Pops are
 // decoration: failures skip a pop, and a rate limit stops new downloads
 // but keeps photos saved by earlier renders.
-func (s *Service) planImagePops(ctx context.Context, segs []Timed, plans []popPlan, width, height int) ([]ImagePop, error) {
+func (s *Service) planImagePops(ctx context.Context, segs []Timed, plans []popPlan, sounds []SFXCue, width, height int) ([]ImagePop, error) {
 	src, ok := s.footage.(ImageSearcher)
 	if !ok || len(segs) == 0 || len(plans) != len(segs) {
 		return nil, nil
 	}
-	times := popTimes(segs, plans)
 	cacheDir := filepath.Join(s.mediaDir, "stock-cache")
 	blocked := readBlocklist(filepath.Join(s.mediaDir, BlocklistFile))
 	used := map[string]bool{}
 	limited := false
 	var pops []ImagePop
 	var lastErr error
-	for i, p := range plans {
-		if times[i][0] < 0 {
-			continue
-		}
+	for _, p := range popMoments(segs, plans, sounds) {
 		var clips []stock.Clip
 		if !limited {
 			c, err := src.SearchImages(ctx, p.Query, width, height, 10)
@@ -221,7 +247,7 @@ func (s *Service) planImagePops(ctx context.Context, segs []Timed, plans []popPl
 				continue
 			}
 			used[key] = true
-			pops = append(pops, ImagePop{Path: path, Start: times[i][0], End: times[i][1], Clip: clip})
+			pops = append(pops, ImagePop{Path: path, Start: p.Start, End: p.End, Clip: clip})
 			break
 		}
 	}

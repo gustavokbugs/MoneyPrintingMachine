@@ -24,7 +24,7 @@ func TestPlanWordEffectsSpacing(t *testing.T) {
 	// "Steam" at 0; "pours" (splash) at 0.4 is too close; "Burning" at 1.6;
 	// segment 2: "steam" at 4.5 may repeat (4.5 s later), so "fire" at 5.3
 	// is too close to it.
-	want := []SFXCue{{At: 0, Kind: SFXHiss}, {At: 1.6, Kind: SFXFire}, {At: 4.5, Kind: SFXHiss}}
+	want := []SFXCue{{At: 0, Kind: SFXHiss, Word: "steam"}, {At: 1.6, Kind: SFXFire, Word: "burning"}, {At: 4.5, Kind: SFXHiss, Word: "steam"}}
 	if len(cues) != 3 || cues[0] != want[0] || cues[1] != want[1] || cues[2] != want[2] {
 		t.Fatalf("cues = %+v", cues)
 	}

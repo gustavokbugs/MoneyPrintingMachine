@@ -448,6 +448,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		}
 	}
 	var pops []ImagePop
+	var wordFX []SFXCue
 	background := ""
 	if resolved == StyleGameplay && s.tools.AnimatedScenes() {
 		// The owner's own clip replaces the drawn game when there is one.
@@ -464,10 +465,11 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		// Key words: a photo pops up on each fix word, and captions color
 		// fixes yellow and problems red. The story renders without them.
 		plans := s.planPops(rctx, segs)
+		wordFX = PlanWordEffects(segs)
 		fixes, problems := captionMarks(segs, plans)
 		captions = MarkCaptions(captions, fixes, problems)
 		if s.FootageAvailable() {
-			if pops, err = s.planImagePops(rctx, segs, plans, width, height); err != nil {
+			if pops, err = s.planImagePops(rctx, segs, plans, wordFX, width, height); err != nil {
 				note = strings.TrimSpace(note + " Pop-up images were skipped: " + truncateErr(err, 200))
 			}
 			credits = PopCredits(pops)
@@ -516,7 +518,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	effects := PlanEffects(scenes, resolved)
 	if resolved == StyleGameplay {
 		// Sounds on the words that name them ("burning" sizzles).
-		effects = append(effects, PlanWordEffects(segs)...)
+		effects = append(effects, wordFX...)
 	}
 	if visual == "" {
 		// Without animated scenes there are no transitions to accent.
