@@ -3,6 +3,7 @@ package production
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -16,6 +17,8 @@ type fakeFootage struct {
 	searches []string
 	// limitAfter rate-limits every search after this many (0 = never).
 	limitAfter int
+	// failDownload makes downloads of these clip IDs fail with the error.
+	failDownload map[int64]error
 }
 
 func (f *fakeFootage) Available() bool { return true }
@@ -30,7 +33,10 @@ func (f *fakeFootage) Search(_ context.Context, q, orientation string, _, _, _ i
 	return f.results[q], nil
 }
 func (f *fakeFootage) Download(_ context.Context, c stock.Clip, dir string) (string, error) {
-	return dir + "/clip.mp4", nil
+	if err := f.failDownload[c.ID]; err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s/clip-%d.mp4", dir, c.ID), nil
 }
 
 func TestShotLengthsAddUp(t *testing.T) {
@@ -230,5 +236,28 @@ func TestPlanFootageKeepsResultsAfterRateLimit(t *testing.T) {
 	}
 	if len(f.searches) != 2 {
 		t.Errorf("searches = %v, want searching to stop at the first rate limit", f.searches)
+	}
+}
+
+// Failed downloads try other clips, then reuse downloaded ones; only a
+// video with no downloadable clip fails.
+func TestPlanFootageSurvivesFailedDownloads(t *testing.T) {
+	clips := []stock.Clip{{ID: 1, Duration: 10}, {ID: 2, Duration: 10}, {ID: 3, Duration: 10}}
+	f := &fakeFootage{results: map[string][]stock.Clip{"mold": clips}, failDownload: map[int64]error{
+		1: fmt.Errorf("download clip 1: %w", stock.ErrRateLimited), 3: errors.New("HTTP 404")}}
+	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
+	svc.WithFootage(f)
+	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"mold"}, {"mold"}}, "", 1080, 1920, t.TempDir())
+	if err != nil || len(shots) != 3 {
+		t.Fatalf("shots=%d err=%v", len(shots), err)
+	}
+	for i, s := range shots {
+		if s.Clip.ID != 2 || s.Path == "" {
+			t.Errorf("shot %d = clip %d %q, want the one downloadable clip", i, s.Clip.ID, s.Path)
+		}
+	}
+	f.failDownload[2] = errors.New("HTTP 500")
+	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"mold"}}, "", 1080, 1920, t.TempDir()); err == nil {
+		t.Fatal("expected an error when no clip downloads")
 	}
 }

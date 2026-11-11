@@ -197,7 +197,9 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 	if len(all) == 0 {
 		return nil, fmt.Errorf("no stock footage found for any segment (%s)", strings.Join(queries[0], "; "))
 	}
-	var shots []FootageShot
+	var shots, downloaded []FootageShot
+	var lastErr error
+	limits := 0
 	for i, seg := range segs {
 		lengths := shotLengths(seg.Duration)
 		if i == len(segs)-1 && len(lengths) > 0 {
@@ -208,25 +210,56 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 			pool = all // borrow on-topic clips found for other segments
 		}
 		for k, length := range lengths {
-			clip, ok := pickClip(pool, used, length)
-			if !ok {
-				clip = pool[k%len(pool)] // reuse when the pool is exhausted
+			shot := FootageShot{Length: length}
+			// A failed download tries other clips; after repeated rate
+			// limits, the shot reuses a clip that is already downloaded.
+			for try := 0; try < maxDownloadTries && limits < maxRateLimits; try++ {
+				clip, ok := pickClip(pool, used, length)
+				if !ok {
+					clip = pool[(k+try)%len(pool)] // reuse when the pool is exhausted
+				}
+				used[clipKey(clip)] = true
+				path, err := s.footage.Download(ctx, clip, cacheDir)
+				if err != nil {
+					if ctx.Err() != nil {
+						return nil, ctx.Err()
+					}
+					lastErr = err
+					if errors.Is(err, stock.ErrRateLimited) {
+						limits++
+					}
+					continue
+				}
+				shot.Clip, shot.Path = clip, path
+				downloaded = append(downloaded, shot)
+				break
 			}
-			used[clipKey(clip)] = true
-			path, err := s.footage.Download(ctx, clip, cacheDir)
-			if err != nil {
-				return nil, err
-			}
-			// Start a little into the clip, away from fades at its start.
-			offset := 0.0
-			if clip.Duration > length+1.5 {
-				offset = math.Min(1, clip.Duration-length-0.5)
-			}
-			shots = append(shots, FootageShot{Clip: clip, Path: path, Offset: offset, Length: length})
+			shots = append(shots, shot)
+		}
+	}
+	if len(downloaded) == 0 {
+		return nil, lastErr
+	}
+	for i := range shots {
+		if shots[i].Path == "" {
+			d := downloaded[i%len(downloaded)]
+			shots[i].Clip, shots[i].Path = d.Clip, d.Path
+		}
+		// Start a little into the clip, away from fades at its start.
+		shots[i].Offset = 0
+		if c := shots[i].Clip; c.Duration > shots[i].Length+1.5 {
+			shots[i].Offset = math.Min(1, c.Duration-shots[i].Length-0.5)
 		}
 	}
 	return shots, nil
 }
+
+// Download retry bounds: tries per shot, and rate limits per video before
+// only already-downloaded clips are used.
+const (
+	maxDownloadTries = 3
+	maxRateLimits    = 3
+)
 
 // broaden returns the queries followed by shorter forms of them and the
 // niche, without duplicates.
