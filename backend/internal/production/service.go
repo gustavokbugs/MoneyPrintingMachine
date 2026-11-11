@@ -538,12 +538,16 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	}, nil
 }
 
-// hookText is the opening line for the gameplay story's hook card.
+// hookText is the whole hook (both sentences of a setup and punchline)
+// for the gameplay story's hook card, capped at 140 characters.
 func hookText(segs []Timed) string {
 	if len(segs) == 0 {
 		return ""
 	}
-	return firstSentence(segs[0].Text, 140)
+	if r := []rune(strings.TrimSpace(segs[0].Text)); len(r) > 140 {
+		return strings.TrimSpace(string(r[:140])) + "…"
+	}
+	return strings.TrimSpace(segs[0].Text)
 }
 
 // captionsFor picks the caption layout: one word at a time for the

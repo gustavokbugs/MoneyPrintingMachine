@@ -137,3 +137,17 @@ func (cutRunner) Run(_ context.Context, _, name string, args ...string) ([]byte,
 	}
 	return nil, os.WriteFile(args[len(args)-1], []byte("clip"), 0o644)
 }
+
+func TestHookTextKeepsThePunchline(t *testing.T) {
+	got := hookText([]Timed{{Text: "You just want to read at night. Congrats, you're about to invent the light bulb."}})
+	if got != "You just want to read at night. Congrats, you're about to invent the light bulb." {
+		t.Errorf("hook = %q", got)
+	}
+	long := hookText([]Timed{{Text: strings.Repeat("word ", 40)}})
+	if len([]rune(long)) > 141 || !strings.HasSuffix(long, "…") {
+		t.Errorf("long hook = %q", long)
+	}
+	if hookText(nil) != "" {
+		t.Error("no segments")
+	}
+}
