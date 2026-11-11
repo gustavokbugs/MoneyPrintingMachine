@@ -20,7 +20,7 @@ type VideoRepository struct {
 func NewVideoRepository(pool *pgxpool.Pool) *VideoRepository { return &VideoRepository{pool: pool} }
 
 const videoColumns = `id::text, owner_id, channel_id::text, idea_index, title, format, aspect_ratio, target_seconds,
-	status, status_reason, voice_id, visual_style, script, output, version, created_at, updated_at, dialogue_mode, voice_b`
+	status, status_reason, voice_id, visual_style, script, output, version, created_at, updated_at, dialogue_mode, voice_b, story_format`
 
 func scanVideo(row pgx.Row) (*production.Video, error) {
 	var (
@@ -30,7 +30,7 @@ func scanVideo(row pgx.Row) (*production.Video, error) {
 	)
 	if err := row.Scan(&v.ID, &v.OwnerID, &v.ChannelID, &v.IdeaIndex, &v.Title, &v.Format, &v.AspectRatio, &v.TargetSeconds,
 		&status, &v.StatusReason, &v.VoiceID, &v.VisualStyle, &script, &output, &v.Version, &v.CreatedAt, &v.UpdatedAt,
-		&v.DialogueMode, &v.VoiceB); err != nil {
+		&v.DialogueMode, &v.VoiceB, &v.StoryFormat); err != nil {
 		return nil, err
 	}
 	v.Status = production.Status(status)
@@ -112,9 +112,10 @@ func (r *VideoRepository) Save(ctx context.Context, v *production.Video) error {
 		}
 	}
 	tag, err := r.pool.Exec(ctx, `UPDATE videos SET status = $1, status_reason = $2, voice_id = $3, script = $4, output = $5, visual_style = $9,
-			dialogue_mode = $10, voice_b = $11, version = version + 1, updated_at = now()
+			dialogue_mode = $10, voice_b = $11, story_format = $12, target_seconds = $13, version = version + 1, updated_at = now()
 		WHERE id = $6 AND owner_id = $7 AND version = $8`,
-		string(v.Status), v.StatusReason, v.VoiceID, script, output, v.ID, v.OwnerID, v.Version, styleOrAuto(v.VisualStyle), dialogueOrNarration(v.DialogueMode), voiceBOrDefault(v.VoiceB))
+		string(v.Status), v.StatusReason, v.VoiceID, script, output, v.ID, v.OwnerID, v.Version, styleOrAuto(v.VisualStyle), dialogueOrNarration(v.DialogueMode), voiceBOrDefault(v.VoiceB),
+		formatOrExplainer(v.StoryFormat), v.TargetSeconds)
 	if err != nil {
 		return fmt.Errorf("update video: %w", err)
 	}
@@ -126,6 +127,13 @@ func (r *VideoRepository) Save(ctx context.Context, v *production.Video) error {
 	}
 	v.Version++
 	return nil
+}
+
+func formatOrExplainer(f string) string {
+	if f == "" {
+		return production.FormatExplainer
+	}
+	return f
 }
 
 func dialogueOrNarration(m string) string {

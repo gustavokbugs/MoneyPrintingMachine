@@ -35,6 +35,17 @@ func TestVideoRepository(t *testing.T) {
 	if err != nil || got.Script == nil || len(got.Script.Claims) != 1 || got.Version != 2 || got.Status != production.StatusScriptReady {
 		t.Fatalf("get: %+v %v", got, err)
 	}
+	if got.StoryFormat != production.FormatExplainer {
+		t.Errorf("default story format = %q", got.StoryFormat)
+	}
+	got.StoryFormat, got.TargetSeconds = production.FormatEscalation, production.ShortFormatSeconds
+	if err := r.Save(ctx, got); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := r.Get(ctx, "alice", v.ID); err != nil || again.StoryFormat != production.FormatEscalation || again.TargetSeconds != production.ShortFormatSeconds {
+		t.Fatalf("story format round trip: %+v %v", again, err)
+	}
+
 	stale := *got
 	stale.Version = 1
 	if err := r.Save(ctx, &stale); !errors.Is(err, production.ErrConflict) {
