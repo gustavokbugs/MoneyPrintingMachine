@@ -145,7 +145,7 @@ type FootageShot struct {
 
 // planFootage picks and downloads a clip for every shot. A clip is reused
 // only when the searches return too few distinct clips.
-func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]string, niche string, width, height int, cacheDir string) ([]FootageShot, error) {
+func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]string, width, height int, cacheDir string) ([]FootageShot, error) {
 	orientation := "landscape"
 	if height > width {
 		orientation = "portrait"
@@ -170,14 +170,15 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 		searched[q] = c
 		return c, nil
 	}
-	// Find a pool of clips per segment. Narrow queries often find nothing
-	// on free archives, so broaden them before giving up on a segment.
+	// Find a pool of clips per segment. A segment whose queries find
+	// nothing borrows clips found for the others: shortened or generic
+	// queries return off-topic images on free archives.
 	pools := make([][]stock.Clip, len(segs))
 	var all []stock.Clip
 	var limited error // set once a provider rate-limits; stop searching
 	for i, seg := range segs {
 		need := 2 * len(shotLengths(seg.Duration))
-		for _, q := range broaden(queries[i], niche) {
+		for _, q := range queries[i] {
 			if limited != nil {
 				break
 			}
@@ -278,29 +279,6 @@ const (
 	maxDownloadTries = 3
 	maxRateLimits    = 3
 )
-
-// broaden returns the queries followed by shorter forms of them and the
-// niche, without duplicates.
-func broaden(queries []string, niche string) []string {
-	var out []string
-	seen := map[string]bool{}
-	add := func(q string) {
-		if q = cleanQuery(q); q != "" && !seen[q] {
-			seen[q] = true
-			out = append(out, q)
-		}
-	}
-	for _, q := range queries {
-		add(q)
-	}
-	for _, q := range queries {
-		if f := strings.Fields(q); len(f) > 2 {
-			add(strings.Join(f[len(f)-2:], " ")) // the head noun is usually last
-		}
-	}
-	add(niche)
-	return out
-}
 
 // pickClip returns the first unused clip long enough for the shot, else
 // the first unused one.
@@ -406,7 +384,7 @@ func (s *Service) renderFootage(ctx context.Context, dir string, segs []Timed, n
 		return "", nil, stock.ErrNoKey
 	}
 	queries := s.footageQueries(ctx, segs, niche)
-	shots, err := s.planFootage(ctx, segs, queries, niche, width, height, filepath.Join(s.mediaDir, "stock-cache"))
+	shots, err := s.planFootage(ctx, segs, queries, width, height, filepath.Join(s.mediaDir, "stock-cache"))
 	if err != nil {
 		return "", nil, err
 	}

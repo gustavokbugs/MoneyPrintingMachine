@@ -91,7 +91,7 @@ func TestPlanFootageAvoidsReuseAndCoversDuration(t *testing.T) {
 	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
 	svc.WithFootage(f)
 	segs := []Timed{{Duration: 7}, {Duration: 3.5}}
-	shots, err := svc.planFootage(context.Background(), segs, [][]string{{"moon"}, {"moon"}}, "", 1080, 1920, t.TempDir())
+	shots, err := svc.planFootage(context.Background(), segs, [][]string{{"moon"}, {"moon"}}, 1080, 1920, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,11 +123,11 @@ func TestPlanFootageAvoidsReuseAndCoversDuration(t *testing.T) {
 func TestPlanFootageErrors(t *testing.T) {
 	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
 	svc.WithFootage(&fakeFootage{err: stock.ErrRateLimited})
-	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"x"}}, "", 1920, 1080, t.TempDir()); !errors.Is(err, stock.ErrRateLimited) {
+	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"x"}}, 1920, 1080, t.TempDir()); !errors.Is(err, stock.ErrRateLimited) {
 		t.Fatalf("rate limit: %v", err)
 	}
 	svc.WithFootage(&fakeFootage{results: map[string][]stock.Clip{}})
-	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"x"}}, "", 1920, 1080, t.TempDir()); err == nil {
+	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"x"}}, 1920, 1080, t.TempDir()); err == nil {
 		t.Fatal("expected an error when nothing is found")
 	}
 }
@@ -194,18 +194,17 @@ func TestPlanEffectsFootageWhooshesOnCuts(t *testing.T) {
 	}
 }
 
-// A segment whose queries find nothing broadens them, then borrows clips
-// found for other segments instead of failing the whole video.
-func TestPlanFootageBroadensAndBorrows(t *testing.T) {
+// A segment whose queries find nothing borrows clips found for other
+// segments instead of failing the whole video.
+func TestPlanFootageBorrowsForEmptySegments(t *testing.T) {
 	f := &fakeFootage{results: map[string][]stock.Clip{
-		"petri dish":      {{ID: 1, Duration: 10}},
-		"penicillin mold": {{ID: 2, Duration: 10}},
+		"petri dish": {{ID: 1, Duration: 10}},
 	}}
 	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
 	svc.WithFootage(f)
 	segs := []Timed{{Duration: 3}, {Duration: 3}, {Duration: 3}}
-	queries := [][]string{{"1920s london lab bench"}, {"messy bacteria petri dish"}, {"bacteria"}}
-	shots, err := svc.planFootage(context.Background(), segs, queries, "penicillin mold", 1080, 1920, t.TempDir())
+	queries := [][]string{{"1920s london lab bench"}, {"petri dish"}, {"bacteria"}}
+	shots, err := svc.planFootage(context.Background(), segs, queries, 1080, 1920, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,17 +212,10 @@ func TestPlanFootageBroadensAndBorrows(t *testing.T) {
 		t.Fatalf("shots = %d, want 3", len(shots))
 	}
 	if shots[1].Clip.ID != 1 {
-		t.Errorf("segment 2 should use the broadened query, got clip %d", shots[1].Clip.ID)
+		t.Errorf("segment 2 should use its own query, got clip %d", shots[1].Clip.ID)
 	}
 	if shots[0].Clip.ID == 0 || shots[2].Clip.ID == 0 {
 		t.Errorf("segments without results must still get a clip: %+v", shots)
-	}
-}
-
-func TestBroaden(t *testing.T) {
-	got := strings.Join(broaden([]string{"messy lab bench", "lab bench"}, "Science History"), "|")
-	if got != "messy lab bench|lab bench|science history" {
-		t.Errorf("broaden = %q", got)
 	}
 }
 
@@ -232,7 +224,7 @@ func TestPlanFootageKeepsResultsAfterRateLimit(t *testing.T) {
 	f := &fakeFootage{results: map[string][]stock.Clip{"mold": {{ID: 1, Duration: 10}, {ID: 2, Duration: 10}}}, limitAfter: 1}
 	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
 	svc.WithFootage(f)
-	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"war"}}, "", 1080, 1920, t.TempDir())
+	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"war"}}, 1080, 1920, t.TempDir())
 	if err != nil || len(shots) != 2 {
 		t.Fatalf("shots=%d err=%v, want both segments covered", len(shots), err)
 	}
@@ -249,7 +241,7 @@ func TestPlanFootageSurvivesFailedDownloads(t *testing.T) {
 		1: fmt.Errorf("download clip 1: %w", stock.ErrRateLimited), 3: errors.New("HTTP 404")}}
 	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
 	svc.WithFootage(f)
-	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"mold"}, {"mold"}}, "", 1080, 1920, t.TempDir())
+	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"mold"}, {"mold"}}, 1080, 1920, t.TempDir())
 	if err != nil || len(shots) != 3 {
 		t.Fatalf("shots=%d err=%v", len(shots), err)
 	}
@@ -259,7 +251,7 @@ func TestPlanFootageSurvivesFailedDownloads(t *testing.T) {
 		}
 	}
 	f.failDownload[2] = errors.New("HTTP 500")
-	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"mold"}}, "", 1080, 1920, t.TempDir()); err == nil {
+	if _, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}}, [][]string{{"mold"}}, 1080, 1920, t.TempDir()); err == nil {
 		t.Fatal("expected an error when no clip downloads")
 	}
 }
@@ -273,7 +265,7 @@ func TestPlanFootageSkipsBlockedClips(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(svc.mediaDir, BlocklistFile), []byte(list), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"mold"}}, "", 1080, 1920, t.TempDir())
+	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"mold"}}, 1080, 1920, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +293,7 @@ func TestPlanFootageUsesCachedClipsWhenRateLimited(t *testing.T) {
 	if p, ok := stock.Cached(clip(5), cache); !ok || p == "" {
 		t.Fatalf("cache naming changed: %q %v", p, ok)
 	}
-	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"mold"}}, "", 1080, 1920, cache)
+	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"mold"}}, 1080, 1920, cache)
 	if err != nil {
 		t.Fatal(err)
 	}
