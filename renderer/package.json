@@ -1,0 +1,17 @@
+{
+  "name": "content-factory-renderer",
+  "private": true,
+  "description": "HyperFrames (Apache-2.0) runtime used by the backend to render animated scenes.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@fontsource/fraunces": "5.3.0",
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/space-grotesk": "5.3.0",
+    "gsap": "3.15.0",
+    "hyperframes": "0.8.209"
+  }
+}
