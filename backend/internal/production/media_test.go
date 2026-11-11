@@ -28,9 +28,13 @@ func TestLexiconPathPrefersV1Name(t *testing.T) {
 	if got := tools.LexiconPath(); filepath.Base(got) != "lexicon-us-en.txt" {
 		t.Fatalf("v1 lexicon not preferred: %s", got)
 	}
-	args := strings.Join(TTSArgs(tools, "model.onnx", 3, "hi", "out.wav"), " ")
-	if !strings.Contains(args, "lexicon-us-en.txt") || !strings.Contains(args, "--sid=3") {
+	args := strings.Join(TTSArgs(tools, "model.onnx", 3, 0, "hi", "out.wav"), " ")
+	if !strings.Contains(args, "lexicon-us-en.txt") || !strings.Contains(args, "--sid=3") || strings.Contains(args, "length-scale") {
 		t.Fatalf("args = %s", args)
+	}
+	fast := TTSArgs(tools, "model.onnx", 3, 1.25, "hi", "out.wav")
+	if !strings.Contains(strings.Join(fast, " "), "--kokoro-length-scale=0.800") || fast[len(fast)-1] != "hi" {
+		t.Fatalf("fast args = %v (the text must stay last)", fast)
 	}
 }
 

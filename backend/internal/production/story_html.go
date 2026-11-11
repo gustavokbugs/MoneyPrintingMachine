@@ -33,11 +33,12 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
 .hook .dot { width: calc(var(--u) * 6.5); height: calc(var(--u) * 6.5); border-radius: 50%; background: var(--accent); flex: none; }
 .hook .title { font-weight: 800; font-size: calc(var(--u) * 5.6); line-height: 1.12; letter-spacing: -0.01em; }
 .caps { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 4; pointer-events: none; }
-.cap { position: absolute; left: calc(var(--u) * 5); right: calc(var(--u) * 5); top: {{if .PopData}}58%{{else}}46%{{end}}; transform-origin: 50% 50%;
+.cap { position: absolute; left: calc(var(--u) * 5); right: calc(var(--u) * 5); top: {{if .PopData}}60%{{else}}62%{{end}}; transform-origin: 50% 50%;
   text-align: center; visibility: hidden; color: #FFFFFF; font-weight: 800; font-size: calc(var(--u) * 12.5); line-height: 1.05;
   letter-spacing: -0.015em; -webkit-text-stroke: calc(var(--u) * 1.5) #000000; paint-order: stroke fill;
   filter: drop-shadow(0 calc(var(--u) * 0.8) calc(var(--u) * 0.6) rgba(0,0,0,0.55)); }
 .cap.hot { color: #FFE14D; }
+.cap.problem { color: #FF4D4D; }
 .cap.spk-b { color: #7FDBFF; }
 .cap.spk-b.hot { color: #FFE14D; }
 .pop { position: absolute; left: 50%; top: 20%; width: 80%; height: 34%; z-index: 4; visibility: hidden;
@@ -64,7 +65,7 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
 {{range .PopData}}    <div class="pop" id="{{.ID}}"><img src="{{.Src}}" alt=""></div>
 {{end}}  </div>
   <div class="caps clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="2">
-{{range $i, $c := .Captions}}    <div class="cap{{if $c.Hot}} hot{{end}}{{if eq $c.Speaker "B"}} spk-b{{end}}" id="{{cid $i}}" style="{{capsize $c}}">{{range $c.Words}}{{.Text}} {{end}}</div>
+{{range $i, $c := .Captions}}    <div class="cap{{if $c.Hot}} hot{{end}}{{if $c.Problem}} problem{{end}}{{if eq $c.Speaker "B"}} spk-b{{end}}" id="{{cid $i}}" style="{{capsize $c}}">{{range $c.Words}}{{.Text}} {{end}}</div>
 {{end}}  </div>
   <div class="fx clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="3">
     <div class="end" id="end">Follow {{.ChannelName}} for more</div>

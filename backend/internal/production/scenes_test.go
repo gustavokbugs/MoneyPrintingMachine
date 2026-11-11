@@ -202,8 +202,8 @@ func TestWordCaptionsShowOneWordAndPairShortOnes(t *testing.T) {
 func TestCaptionFontFitsLongWords(t *testing.T) {
 	short := captionFontUnits(CaptionChunk{Words: []CaptionWord{{Text: "yes"}}})
 	long := captionFontUnits(CaptionChunk{Words: []CaptionWord{{Text: "electromagnetically"}}})
-	if short != 12.5 {
-		t.Errorf("short word size = %v, want the 12.5 cap", short)
+	if short != CaptionMaxUnits {
+		t.Errorf("short word size = %v, want the %v cap", short, CaptionMaxUnits)
 	}
 	if long*0.62*19 > 90.01 {
 		t.Errorf("long word overflows: %v units", long)
@@ -234,7 +234,7 @@ func TestWriteProjectGameplayStory(t *testing.T) {
 			t.Errorf("unescaped %q", bad)
 		}
 	}
-	for _, want := range []string{`<canvas id="game"`, `id="hook"`, `class="cap hot"`, `font-size: calc(var(--u) * 12.50)`, `window.__timelines["main"]`} {
+	for _, want := range []string{`<canvas id="game"`, `id="hook"`, `class="cap hot"`, `font-size: calc(var(--u) * 9.50)`, `window.__timelines["main"]`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing %q", want)
 		}

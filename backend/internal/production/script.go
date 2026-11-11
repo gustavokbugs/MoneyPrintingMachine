@@ -83,7 +83,7 @@ func (s *Service) GenerateScript(ctx context.Context, ch *channel.Channel, v *Vi
 		return nil, &channel.ValidationError{Field: "ideaIndex", Message: "the blueprint idea no longer exists"}
 	}
 	idea := ch.Blueprint.Ideas[v.IdeaIndex]
-	words := int(float64(v.TargetSeconds) * WordsPerSecond)
+	words := int(float64(v.TargetSeconds) * WordsPerSecond * paceOf(v.StoryFormat))
 	sections := min(max(v.TargetSeconds/45, 2), 10)
 	mode, dialogue := dialogueMode(v.DialogueMode)
 	dialogue = dialogue && IsDialogue(mode.ID)

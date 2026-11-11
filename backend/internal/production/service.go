@@ -341,7 +341,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	if err != nil {
 		return nil, err
 	}
-	narrator := Narrator{Tools: tools, Runner: s.runner, CacheDir: filepath.Join(s.mediaDir, "tts-cache")}
+	narrator := Narrator{Tools: tools, Runner: s.runner, CacheDir: filepath.Join(s.mediaDir, "tts-cache"), Pace: paceOf(v.StoryFormat)}
 	lex, err := LoadLexicon(tools.LexiconPath())
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrToolsMissing, err)
@@ -448,17 +448,24 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		}
 	}
 	var pops []ImagePop
-	if resolved == StyleGameplay && s.tools.AnimatedScenes() && s.FootageAvailable() {
-		// Photos that pop up on key words; the story renders without them.
-		if pops, err = s.planImagePops(rctx, segs, width, height); err != nil {
-			note = strings.TrimSpace(note + " Pop-up images were skipped: " + truncateErr(err, 200))
+	captions := captionsFor(resolved, segs, width, height)
+	if resolved == StyleGameplay && s.tools.AnimatedScenes() {
+		// Key words: a photo pops up on each fix word, and captions color
+		// fixes yellow and problems red. The story renders without them.
+		plans := s.planPops(rctx, segs)
+		fixes, problems := captionMarks(segs, plans)
+		captions = MarkCaptions(captions, fixes, problems)
+		if s.FootageAvailable() {
+			if pops, err = s.planImagePops(rctx, segs, plans, width, height); err != nil {
+				note = strings.TrimSpace(note + " Pop-up images were skipped: " + truncateErr(err, 200))
+			}
+			credits = PopCredits(pops)
 		}
-		credits = PopCredits(pops)
 	}
 	if resolved != StyleFootage && s.tools.AnimatedScenes() {
 		visual, err = s.renderScenes(rctx, dir, ProjectInput{
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
-			ChannelName: ch.Name, Scenes: scenes, Captions: captionsFor(resolved, segs, width, height), Seed: seedOf(v.ID),
+			ChannelName: ch.Name, Scenes: scenes, Captions: captions, Seed: seedOf(v.ID),
 			Pops: pops, HookText: hookText(segs),
 		})
 		if err != nil {

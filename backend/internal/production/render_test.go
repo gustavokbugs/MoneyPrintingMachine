@@ -110,6 +110,13 @@ func TestNarratorCachesAndPassesArgs(t *testing.T) {
 	if _, err := n.Synthesize(context.Background(), 6, "  "); err == nil {
 		t.Fatal("empty text must fail")
 	}
+	// A different pace is different audio, so it must not hit the cache.
+	fast := n
+	fast.Pace = ShortPace
+	p3, err := fast.Synthesize(context.Background(), 6, text)
+	if err != nil || p3 == p1 || len(r.calls) != 2 || !contains(r.calls[1], "--kokoro-length-scale=0.833") {
+		t.Fatalf("fast narration: %q %v calls=%d", p3, err, len(r.calls))
+	}
 	d, err := ProbeDuration(context.Background(), r, "ffprobe", p1)
 	if err != nil || d != 12.5 {
 		t.Fatalf("probe = %v %v", d, err)

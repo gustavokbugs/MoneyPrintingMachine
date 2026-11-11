@@ -35,12 +35,14 @@ const (
 const popSystemPrompt = `You pick one picture moment per narrated segment of a short video.
 Rules:
 - For each segment, "keyword" is ONE word copied exactly from that segment's text: the moment a picture pops up. Prefer a concrete noun.
+- "problem" is ONE word copied exactly from that segment's text naming what goes wrong (like "gaps", "crack", "smoke"), or "" when nothing goes wrong in it.
 - "query" is 1 to 3 English words to search a photo archive for that thing: a concrete, photographable object, animal, place, or scene. No people's names, no abstract ideas, no dates or numbers.
 - Respond only with JSON matching the schema.`
 
 type popOutput struct {
 	Segments []struct {
 		Keyword string `json:"keyword"`
+		Problem string `json:"problem"`
 		Query   string `json:"query"`
 	} `json:"segments"`
 }
@@ -51,8 +53,8 @@ func popSchema(n int) json.RawMessage {
 		"type": "object", "additionalProperties": false, "required": []string{"segments"},
 		"properties": map[string]any{"segments": map[string]any{
 			"type": "array", "minItems": n, "maxItems": n,
-			"items": map[string]any{"type": "object", "additionalProperties": false, "required": []string{"keyword", "query"},
-				"properties": map[string]any{"keyword": str, "query": str}},
+			"items": map[string]any{"type": "object", "additionalProperties": false, "required": []string{"keyword", "problem", "query"},
+				"properties": map[string]any{"keyword": str, "problem": str, "query": str}},
 		}},
 	}
 	raw, _ := json.Marshal(s)
@@ -60,7 +62,7 @@ func popSchema(n int) json.RawMessage {
 }
 
 // popPlan is the key word and photo query for one segment.
-type popPlan struct{ Keyword, Query string }
+type popPlan struct{ Keyword, Problem, Query string }
 
 // planPops asks the local model for a key word and query per segment and
 // falls back to the segment's longest word and title.
@@ -78,7 +80,10 @@ func (s *Service) planPops(ctx context.Context, segs []Timed) []popPlan {
 	out := make([]popPlan, len(segs))
 	for i, seg := range segs {
 		if err == nil && i < len(res.Segments) {
-			out[i] = popPlan{Keyword: normWord(res.Segments[i].Keyword), Query: cleanQuery(res.Segments[i].Query)}
+			out[i] = popPlan{Keyword: normWord(res.Segments[i].Keyword), Problem: normWord(res.Segments[i].Problem), Query: cleanQuery(res.Segments[i].Query)}
+		}
+		if out[i].Problem != "" && (wordIndex(seg.Text, out[i].Problem) < 0 || out[i].Problem == out[i].Keyword) {
+			out[i].Problem = ""
 		}
 		if out[i].Keyword == "" || wordIndex(seg.Text, out[i].Keyword) < 0 {
 			out[i].Keyword = longestWord(seg.Text)
@@ -147,15 +152,32 @@ func popTimes(segs []Timed, plans []popPlan) [][2]float64 {
 	return times
 }
 
+// captionMarks returns when each segment's fix and problem words are
+// spoken, for MarkCaptions.
+func captionMarks(segs []Timed, plans []popPlan) (fixes, problems []float64) {
+	offset := 0.0
+	for i, seg := range segs {
+		if i < len(plans) {
+			if plans[i].Keyword != "" && wordIndex(seg.Text, plans[i].Keyword) >= 0 {
+				fixes = append(fixes, offset+keywordTime(seg, plans[i].Keyword))
+			}
+			if plans[i].Problem != "" {
+				problems = append(problems, offset+keywordTime(seg, plans[i].Problem))
+			}
+		}
+		offset += seg.Duration
+	}
+	return fixes, problems
+}
+
 // planImagePops finds and downloads one photo per segment. Pops are
 // decoration: failures skip a pop, and a rate limit stops new downloads
 // but keeps photos saved by earlier renders.
-func (s *Service) planImagePops(ctx context.Context, segs []Timed, width, height int) ([]ImagePop, error) {
+func (s *Service) planImagePops(ctx context.Context, segs []Timed, plans []popPlan, width, height int) ([]ImagePop, error) {
 	src, ok := s.footage.(ImageSearcher)
-	if !ok || len(segs) == 0 {
+	if !ok || len(segs) == 0 || len(plans) != len(segs) {
 		return nil, nil
 	}
-	plans := s.planPops(ctx, segs)
 	times := popTimes(segs, plans)
 	cacheDir := filepath.Join(s.mediaDir, "stock-cache")
 	blocked := readBlocklist(filepath.Join(s.mediaDir, BlocklistFile))

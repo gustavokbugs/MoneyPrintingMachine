@@ -56,7 +56,7 @@ func TestPopTimesAvoidOverlap(t *testing.T) {
 }
 
 func TestPlanImagePops(t *testing.T) {
-	gen := &scriptedGen{responses: []string{`{"segments":[{"keyword":"Friends","query":"friends laughing"},{"keyword":"nope","query":"computer virus"}]}`}}
+	gen := &scriptedGen{responses: []string{`{"segments":[{"keyword":"Friends","problem":"prank","query":"friends laughing"},{"keyword":"nope","problem":"absent","query":"computer virus"}]}`}}
 	svc, _ := newTestService(t, gen, nil, Tools{})
 	img := func(id int64) stock.Clip {
 		return stock.Clip{Provider: stock.ProviderCommons, ID: id, Image: true, FileURL: fmt.Sprintf("https://upload.wikimedia.org/%d.jpg", id)}
@@ -67,7 +67,11 @@ func TestPlanImagePops(t *testing.T) {
 	}}
 	svc.WithFootage(f)
 	segs := []Timed{{Duration: 5, Text: "You prank your friends."}, {Duration: 5, Text: "Congrats, a virus."}}
-	pops, err := svc.planImagePops(context.Background(), segs, 1080, 1920)
+	plans := svc.planPops(context.Background(), segs)
+	if plans[0].Problem != "prank" || plans[1].Problem != "" || plans[1].Keyword != "congrats" {
+		t.Errorf("plans = %+v (problem words must come from the text)", plans)
+	}
+	pops, err := svc.planImagePops(context.Background(), segs, plans, 1080, 1920)
 	if err != nil || len(pops) != 2 {
 		t.Fatalf("pops=%+v err=%v", pops, err)
 	}
@@ -87,11 +91,11 @@ func TestPlanImagePops(t *testing.T) {
 
 	// A provider error with nothing found is reported; no searcher, no pops.
 	f.err = fmt.Errorf("search: %w", stock.ErrRateLimited)
-	if _, err := svc.planImagePops(context.Background(), segs, 1080, 1920); !errors.Is(err, stock.ErrRateLimited) {
+	if _, err := svc.planImagePops(context.Background(), segs, plans, 1080, 1920); !errors.Is(err, stock.ErrRateLimited) {
 		t.Errorf("err = %v", err)
 	}
 	svc.WithFootage(&fakeFootage{})
-	if pops, err := svc.planImagePops(context.Background(), segs, 1080, 1920); pops != nil || err != nil {
+	if pops, err := svc.planImagePops(context.Background(), segs, plans, 1080, 1920); pops != nil || err != nil {
 		t.Errorf("without image search: %v %v", pops, err)
 	}
 }
@@ -122,5 +126,24 @@ func TestWriteProjectIncludesPops(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "assets", "pop-0.jpg")); err != nil {
 		t.Error("pop image not copied into the project")
+	}
+}
+
+func TestMarkCaptions(t *testing.T) {
+	chunks := []CaptionChunk{{Start: 0, End: 0.5, Hot: true}, {Start: 0.5, End: 1}, {Start: 1, End: 1.5}}
+	got := MarkCaptions(chunks, []float64{0.52}, []float64{1.0})
+	if got[0].Hot || got[0].Problem {
+		t.Error("old highlights must be cleared")
+	}
+	if !got[1].Hot || got[1].Problem || !got[2].Problem || got[2].Hot {
+		t.Errorf("marks = %+v", got)
+	}
+	if !chunks[0].Hot {
+		t.Error("MarkCaptions must not modify its input")
+	}
+	fixes, problems := captionMarks([]Timed{{Duration: 2, Text: "it cracks so clay"}, {Duration: 2, Text: "done"}},
+		[]popPlan{{Keyword: "clay", Problem: "cracks"}, {Keyword: "done"}})
+	if len(fixes) != 2 || fixes[0] != 1.5 || fixes[1] != 2 || len(problems) != 1 || problems[0] != 0.5 {
+		t.Errorf("fixes=%v problems=%v", fixes, problems)
 	}
 }

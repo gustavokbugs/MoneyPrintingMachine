@@ -231,9 +231,10 @@ func modelFile(dir string) (string, error) {
 	return filepath.Base(matches[0]), nil
 }
 
-// TTSArgs builds the sherpa-onnx command line for one utterance.
-func TTSArgs(tools Tools, model string, voice int, text, out string) []string {
-	return []string{
+// TTSArgs builds the sherpa-onnx command line for one utterance. pace
+// above 1 speaks faster (0 means normal).
+func TTSArgs(tools Tools, model string, voice int, pace float64, text, out string) []string {
+	args := []string{
 		"--kokoro-model=" + filepath.Join(tools.ModelDir, model),
 		"--kokoro-voices=" + filepath.Join(tools.ModelDir, "voices.bin"),
 		"--kokoro-tokens=" + filepath.Join(tools.ModelDir, "tokens.txt"),
@@ -241,8 +242,11 @@ func TTSArgs(tools Tools, model string, voice int, text, out string) []string {
 		"--num-threads=4",
 		"--sid=" + strconv.Itoa(voice),
 		"--output-filename=" + out,
-		text,
 	}
+	if pace > 0 && pace != 1 {
+		args = append(args, "--kokoro-length-scale="+strconv.FormatFloat(1/pace, 'f', 3, 64))
+	}
+	return append(args, text)
 }
 
 // Narrator synthesizes speech with a content-addressed cache, so unchanged
@@ -251,6 +255,8 @@ type Narrator struct {
 	Tools    Tools
 	Runner   Runner
 	CacheDir string
+	// Pace is the speaking rate (1.2 is 20% faster); 0 means normal.
+	Pace float64
 }
 
 // CacheKey identifies an utterance by model, voice, and text.
@@ -274,14 +280,18 @@ func (n Narrator) Synthesize(ctx context.Context, voice int, text string) (strin
 	}
 	// The model directory is part of the key so a model upgrade never reuses
 	// audio from the previous model.
-	out := filepath.Join(n.CacheDir, CacheKey(filepath.Base(n.Tools.ModelDir)+"/"+model, voice, text)+".wav")
+	key := filepath.Base(n.Tools.ModelDir) + "/" + model
+	if n.Pace > 0 && n.Pace != 1 {
+		key += "@" + strconv.FormatFloat(n.Pace, 'f', 3, 64) // a new pace is new audio
+	}
+	out := filepath.Join(n.CacheDir, CacheKey(key, voice, text)+".wav")
 	if st, err := os.Stat(out); err == nil && st.Size() > 44 {
 		return out, nil
 	}
 	tmp := out + ".tmp.wav"
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	if _, err := n.Runner.Run(ctx, n.CacheDir, n.Tools.TTS, TTSArgs(n.Tools, model, voice, text, tmp)...); err != nil {
+	if _, err := n.Runner.Run(ctx, n.CacheDir, n.Tools.TTS, TTSArgs(n.Tools, model, voice, n.Pace, text, tmp)...); err != nil {
 		_ = os.Remove(tmp)
 		return "", err
 	}

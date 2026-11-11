@@ -214,8 +214,11 @@ type CaptionWord struct {
 type CaptionChunk struct {
 	Start, End float64
 	Words      []CaptionWord
-	// Hot marks a chunk to highlight (a number or a long key word).
+	// Hot marks a chunk to highlight (a number or a long key word, or
+	// the thing a pop-up shows).
 	Hot bool
+	// Problem marks the word naming what goes wrong (shown in red).
+	Problem bool
 	// Speaker is "B" when the second voice says it.
 	Speaker string
 }
@@ -286,7 +289,33 @@ func captionFontUnits(c CaptionChunk) float64 {
 	for _, w := range c.Words {
 		longest = max(longest, len([]rune(w.Text)))
 	}
-	return math.Min(12.5, 90/(0.62*float64(longest)))
+	return math.Min(CaptionMaxUnits, 90/(0.62*float64(longest)))
+}
+
+// CaptionMaxUnits caps the one-word caption size: big enough to read on
+// a phone, small enough to leave the picture visible (about 1/11 of the
+// width, like popular Shorts).
+const CaptionMaxUnits = 9.5
+
+// MarkCaptions colors captions like problem-solution Shorts: the words at
+// the fix times turn yellow, those at the problem times red, and nothing
+// else is highlighted.
+func MarkCaptions(chunks []CaptionChunk, fixes, problems []float64) []CaptionChunk {
+	out := make([]CaptionChunk, len(chunks))
+	for i, c := range chunks {
+		c.Hot, c.Problem = false, false
+		for _, t := range fixes {
+			c.Hot = c.Hot || (t >= c.Start-0.06 && t < c.End)
+		}
+		for _, t := range problems {
+			c.Problem = c.Problem || (t >= c.Start-0.06 && t < c.End)
+		}
+		if c.Problem {
+			c.Hot = false
+		}
+		out[i] = c
+	}
+	return out
 }
 
 // ProjectInput is everything needed to write a HyperFrames project.
