@@ -31,6 +31,8 @@ const MaxDownloadBytes = 120 << 20
 
 // Clip is one stock video with the file chosen for download.
 type Clip struct {
+	// Provider is ProviderPexels or ProviderCommons.
+	Provider  string  `json:"provider"`
 	ID        int64   `json:"id"`
 	PageURL   string  `json:"pageUrl"`
 	Author    string  `json:"author"`
@@ -38,8 +40,13 @@ type Clip struct {
 	Duration  float64 `json:"duration"`
 	Width     int     `json:"width"`
 	Height    int     `json:"height"`
-	FileURL   string  `json:"-"`
-	FileID    int64   `json:"-"`
+	// License names the license when attribution is required (Commons).
+	License string `json:"license,omitempty"`
+	Title   string `json:"title,omitempty"`
+	// Image marks a still photo (shown with a slow pan) rather than video.
+	Image   bool   `json:"image,omitempty"`
+	FileURL string `json:"-"`
+	FileID  int64  `json:"-"`
 }
 
 // Client calls the Pexels API.
@@ -142,7 +149,7 @@ func (c *Client) Search(ctx context.Context, query, orientation string, width, h
 				break
 			}
 		}
-		out = append(out, Clip{ID: v.ID, PageURL: v.URL, Author: v.User.Name, AuthorURL: v.User.URL, Duration: v.Duration,
+		out = append(out, Clip{Provider: ProviderPexels, ID: v.ID, PageURL: v.URL, Author: v.User.Name, AuthorURL: v.User.URL, Duration: v.Duration,
 			Width: pick.Width, Height: pick.Height, FileURL: pick.Link, FileID: pick.ID})
 	}
 	return out, nil
@@ -155,7 +162,7 @@ func allowedFileHost(u *url.URL) bool {
 		return false
 	}
 	h := strings.ToLower(u.Hostname())
-	for _, suffix := range []string{"pexels.com", "vimeo.com", "vimeocdn.com", "akamaized.net"} {
+	for _, suffix := range []string{"pexels.com", "vimeo.com", "vimeocdn.com", "akamaized.net", "wikimedia.org"} {
 		if h == suffix || strings.HasSuffix(h, "."+suffix) {
 			return true
 		}
@@ -166,22 +173,42 @@ func allowedFileHost(u *url.URL) bool {
 // Download stores the clip's file under dir (cached by clip and file ID)
 // and returns its path.
 func (c *Client) Download(ctx context.Context, clip Clip, dir string) (string, error) {
+	return download(ctx, c.http, clip, dir, "")
+}
+
+// download fetches an allowed HTTPS file with a size cap into dir, named
+// by provider and IDs so repeated renders reuse it.
+func download(ctx context.Context, hc *http.Client, clip Clip, dir, ua string) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create stock cache: %w", err)
-	}
-	out := filepath.Join(dir, fmt.Sprintf("pexels-%d-%d.mp4", clip.ID, clip.FileID))
-	if st, err := os.Stat(out); err == nil && st.Size() > 0 {
-		return out, nil
 	}
 	u, err := url.Parse(clip.FileURL)
 	if err != nil || !allowedFileHost(u) {
 		return "", fmt.Errorf("clip %d has an unexpected file URL", clip.ID)
 	}
+	ext := strings.ToLower(filepath.Ext(u.Path))
+	if ext != ".mp4" && ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+		ext = ".mp4"
+		if clip.Image {
+			ext = ".jpg"
+		}
+	}
+	provider := clip.Provider
+	if provider == "" {
+		provider = ProviderPexels
+	}
+	out := filepath.Join(dir, fmt.Sprintf("%s-%d-%d%s", provider, clip.ID, clip.FileID, ext))
+	if st, err := os.Stat(out); err == nil && st.Size() > 0 {
+		return out, nil
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return "", err
 	}
-	resp, err := c.http.Do(req)
+	if ua != "" {
+		req.Header.Set("User-Agent", ua)
+	}
+	resp, err := hc.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("download clip %d: %w", clip.ID, err)
 	}
