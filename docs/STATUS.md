@@ -37,6 +37,17 @@ Last updated: 2026-11-10
 - Ollama 0.40.16 installed from the signed installer (publisher verified: Ollama Inc.) into `%LOCALAPPDATA%ProgramsOllama`, and `qwen3:4b` pulled. The health check reports `local_model: ok`.
 - Ollama starts with Windows through its tray app. If generation stops working after a reboot, open **Ollama** from the Start menu.
 
+### G9. Install media tools for video production — Owner (one command)
+
+- **Why the owner:** the agent auto-mode safety check blocks running downloaded third-party binaries without explicit approval.
+- **Run once from the repository root:** `powershell -ExecutionPolicy Bypass -File scripts/setup-media-tools.ps1`
+- Installs into `.local/` (gitignored), verifying every file: FFmpeg 8.1 (checksum from the release), sherpa-onnx v2.0.1 and the Kokoro int8 English voice model (pinned SHA-256), Inter font (pinned SHA-256).
+- **Unlocks:** narration and MP4 rendering (Produce button). Script generation and the fact-check gate work without it.
+
+### G10. Production pipeline UI — Planned (next agent task)
+
+- Backend endpoints exist (`/api/channels/{id}/videos`, `/api/videos/{id}/...`); the web pages for scripts, claim review, approval, and the video player are not built yet.
+
 ### G2. YouTube Data API key — Owner
 
 - **Why the owner:** creating it requires signing in to the owner's Google account and accepting Google Cloud's terms. Agents must not sign in, accept terms, or handle the key in web forms.
@@ -85,7 +96,7 @@ Last updated: 2026-11-10
 ## 3. Planned milestones
 
 1. **Trend refresh and RSS** — done on branch `feat/trend-refresh-rss`.
-2. **Production pipeline:** research with sources, scripts with citations and fact-check gates, local narration (Kokoro TTS), visuals, FFmpeg rendering. Needs FFmpeg installed (planned agent task).
+2. **Production pipeline** — backend done (scripts with claim list, fact-check approval gate, Kokoro narration with cache, FFmpeg render with brand colors, titles, captions, SRT); UI pending (G10), tools pending (G9). Originally planned as: research with sources, scripts with citations and fact-check gates, local narration (Kokoro TTS), visuals, FFmpeg rendering. Needs FFmpeg installed (planned agent task).
 3. **Publishing:** YouTube upload with idempotency and validation; depends on G3/G4.
 4. **Analytics:** YouTube Analytics ingestion and the performance dashboard; depends on G3/G4.
 
@@ -93,5 +104,6 @@ Last updated: 2026-11-10
 
 | Date | Change |
 | --- | --- |
+| 2026-11-10 | Production pipeline backend added; PRs #1 and #2 merged; work continues on master. |
 | 2026-11-10 | Trend refresh and RSS milestone built; Ollama and qwen3:4b installed (G1 closed). |
 | 2026-11-10 | Document created. Repository published at <https://github.com/gustavokbugs/MoneyPrintingMachine>. Ollama installer verified and run. |
