@@ -151,7 +151,7 @@ func filterPath(p string) string {
 // brand background is generated instead. Paths in the filter graph are
 // relative to the working directory (the video folder) so no drive letters
 // appear there.
-func FFmpegArgs(visual string, audios []string, total float64, width, height int, background, assFile, fontsDir, out string) []string {
+func FFmpegArgs(visual string, mix AudioMix, total float64, width, height int, background, assFile, fontsDir, out string) []string {
 	bg := strings.TrimPrefix(background, "#")
 	if len(bg) != 6 {
 		bg = "111827"
@@ -162,18 +162,64 @@ func FFmpegArgs(visual string, audios []string, total float64, width, height int
 	} else {
 		args = append(args, "-f", "lavfi", "-i", fmt.Sprintf("color=c=0x%s:s=%dx%d:r=30:d=%s", bg, width, height, strconv.FormatFloat(total+0.5, 'f', 2, 64)))
 	}
-	for _, a := range audios {
+	for _, a := range mix.Voice {
 		args = append(args, "-i", a)
 	}
+	next := len(mix.Voice) + 1
+	musicIn, sfxIn := -1, -1
+	if mix.Music != "" {
+		args = append(args, "-i", mix.Music)
+		musicIn, next = next, next+1
+	}
+	if mix.Effects != "" {
+		args = append(args, "-i", mix.Effects)
+		sfxIn = next
+	}
 	var fc strings.Builder
-	for i := range audios {
+	for i := range mix.Voice {
 		fmt.Fprintf(&fc, "[%d:a]", i+1)
 	}
-	fmt.Fprintf(&fc, "concat=n=%d:v=0:a=1[a];[0:v]subtitles=filename='%s':fontsdir='%s'[v]", len(audios), filterPath(assFile), filterPath(fontsDir))
+	// Voice: concatenate, upsample, remove rumble, and even out dynamics.
+	fmt.Fprintf(&fc, "concat=n=%d:v=0:a=1,aresample=%d,aformat=channel_layouts=stereo,highpass=f=70,"+
+		"acompressor=threshold=0.125:ratio=3:attack=5:release=120:makeup=2", len(mix.Voice), AudioRate)
+	layers := 1
+	if musicIn >= 0 {
+		// The voice keys a compressor on the music so the bed ducks under speech.
+		fmt.Fprintf(&fc, ",asplit=2[voice][key];[%d:a]volume=%s[bed];[bed][key]sidechaincompress=threshold=0.02:ratio=8:attack=20:release=500[music];[voice][music]",
+			musicIn, strconv.FormatFloat(mix.musicGain(), 'f', 2, 64))
+		layers++
+	} else {
+		fc.WriteString("[voice];[voice]")
+	}
+	if sfxIn >= 0 {
+		fmt.Fprintf(&fc, "[%d:a]", sfxIn)
+		layers++
+	}
+	// duration=first keeps the narration length; loudnorm targets the
+	// -14 LUFS level YouTube normalizes to.
+	fmt.Fprintf(&fc, "amix=inputs=%d:duration=first:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=%d[a];", layers, AudioRate)
+	fmt.Fprintf(&fc, "[0:v]subtitles=filename='%s':fontsdir='%s'[v]", filterPath(assFile), filterPath(fontsDir))
 	args = append(args, "-filter_complex", fc.String(), "-map", "[v]", "-map", "[a]",
-		"-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
-		"-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-shortest", out)
+		"-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+		"-c:a", "aac", "-b:a", "192k", "-ar", strconv.Itoa(AudioRate), "-movflags", "+faststart", "-shortest", out)
 	return args
+}
+
+// AudioMix lists the audio inputs of a render: narration segments in order,
+// plus optional music bed and effects tracks (WAV paths).
+type AudioMix struct {
+	Voice   []string
+	Music   string
+	Effects string
+	// MusicGain scales the music bed before ducking (default 0.30).
+	MusicGain float64
+}
+
+func (m AudioMix) musicGain() float64 {
+	if m.MusicGain <= 0 || m.MusicGain > 1 {
+		return 0.30
+	}
+	return m.MusicGain
 }
 
 // WithoutTitles returns a copy of segs with the on-screen titles removed,

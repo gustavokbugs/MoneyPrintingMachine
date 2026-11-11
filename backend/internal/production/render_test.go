@@ -50,14 +50,14 @@ func TestBuildSRT(t *testing.T) {
 }
 
 func TestFFmpegArgs(t *testing.T) {
-	args := FFmpegArgs("", []string{"C:/cache/a.wav", "C:/cache/b.wav"}, 12.3, 1080, 1920, "#0F172A", "captions.ass", `..\..\fonts`, "video.mp4")
+	args := FFmpegArgs("", AudioMix{Voice: []string{"C:/cache/a.wav", "C:/cache/b.wav"}}, 12.3, 1080, 1920, "#0F172A", "captions.ass", `..\..\fonts`, "video.mp4")
 	joined := strings.Join(args, " ")
 	for _, want := range []string{"color=c=0x0F172A:s=1080x1920:r=30:d=12.80", "[1:a][2:a]concat=n=2", "fontsdir='../../fonts'", "-c:v libx264", "video.mp4"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("missing %q in %s", want, joined)
 		}
 	}
-	animated := strings.Join(FFmpegArgs("visual.mp4", []string{"a.wav"}, 5, 1920, 1080, "#000000", "c.ass", "f", "o.mp4"), " ")
+	animated := strings.Join(FFmpegArgs("visual.mp4", AudioMix{Voice: []string{"a.wav"}}, 5, 1920, 1080, "#000000", "c.ass", "f", "o.mp4"), " ")
 	if !strings.Contains(animated, "-i visual.mp4") || strings.Contains(animated, "lavfi") {
 		t.Fatalf("animated visual must replace the solid background: %s", animated)
 	}

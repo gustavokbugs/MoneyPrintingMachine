@@ -164,6 +164,10 @@ type Output struct {
 	// "solid" (fallback), plus a note when the fallback was used.
 	Visuals     string `json:"visuals"`
 	VisualsNote string `json:"visualsNote,omitempty"`
+	// Music describes the soundtrack's provenance; SoundEffects counts the
+	// effects placed on the timeline.
+	Music        string `json:"music,omitempty"`
+	SoundEffects int    `json:"soundEffects,omitempty"`
 }
 
 // Video is one production unit.

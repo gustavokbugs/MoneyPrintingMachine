@@ -416,11 +416,12 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	// Animated scenes: render the picture with HyperFrames, then mix narration
 	// and captions over it. Fall back to the solid background if unavailable.
 	visual, visuals, note := "", "solid", ""
+	resolved := ResolveStyle(v.VisualStyle, ch.Niche)
+	scenes := PlanScenes(segs, kickers, ch.Name)
 	if s.tools.AnimatedScenes() {
-		resolved := ResolveStyle(v.VisualStyle, ch.Niche)
 		visual, err = s.renderScenes(rctx, dir, ProjectInput{
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
-			ChannelName: ch.Name, Scenes: PlanScenes(segs, kickers, ch.Name),
+			ChannelName: ch.Name, Scenes: scenes,
 		})
 		if err != nil {
 			visual, note = "", "Animated scenes failed, so a plain background was used: "+truncateErr(err, 300)
@@ -438,8 +439,22 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	if err := os.WriteFile(filepath.Join(dir, "captions.ass"), []byte(BuildASS(assSegs, width, height, style)), 0o644); err != nil {
 		return nil, fmt.Errorf("write subtitles: %w", err)
 	}
+	// Soundtrack: an original music bed and effects synthesized in code.
+	mood := MoodFor(resolved)
+	mix := AudioMix{Voice: audios, Music: "music.wav", Effects: "effects.wav"}
+	if err := ComposeMusic(mood, total+1, v.ID+":"+mood.Name).WriteWAV(filepath.Join(dir, mix.Music)); err != nil {
+		return nil, fmt.Errorf("compose music: %w", err)
+	}
+	effects := PlanEffects(scenes)
+	if visual == "" {
+		// Without animated scenes there are no transitions to accent.
+		effects = nil
+	}
+	if err := RenderEffects(effects, total+1, v.ID).WriteWAV(filepath.Join(dir, mix.Effects)); err != nil {
+		return nil, fmt.Errorf("render effects: %w", err)
+	}
 	tmp := "video.tmp.mp4"
-	if _, err := s.runner.Run(rctx, dir, s.tools.FFmpeg, FFmpegArgs(visual, audios, total, width, height, style.Background, "captions.ass", fontsRel, tmp)...); err != nil {
+	if _, err := s.runner.Run(rctx, dir, s.tools.FFmpeg, FFmpegArgs(visual, mix, total, width, height, style.Background, "captions.ass", fontsRel, tmp)...); err != nil {
 		_ = os.Remove(filepath.Join(dir, tmp))
 		return nil, fmt.Errorf("render video: %w", err)
 	}
@@ -454,6 +469,8 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		VideoFile: "video.mp4", CaptionsFile: "captions.srt", DurationSeconds: dur,
 		Width: width, Height: height, RenderedAt: s.now().UTC(), SyntheticVoice: true,
 		Visuals: visuals, VisualsNote: note,
+		Music:        "Original score generated in code (" + mood.Description + "); no third-party audio.",
+		SoundEffects: len(effects),
 	}, nil
 }
 
