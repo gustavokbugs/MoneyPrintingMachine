@@ -30,8 +30,12 @@ type Tools struct {
 }
 
 // ToolsFromRoot returns the default layout created by the setup script
-// under root (the repository's .local directory).
+// under root (the repository's .local directory). Paths are made absolute
+// because tools run with a different working directory.
 func ToolsFromRoot(root string) Tools {
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
 	exe := func(p string) string { return filepath.Join(root, p) }
 	return Tools{
 		FFmpeg:   exe(filepath.Join("ffmpeg", "bin", "ffmpeg.exe")),

@@ -121,6 +121,16 @@ func contains(xs []string, s string) bool {
 	return false
 }
 
+func TestToolsFromRootIsAbsolute(t *testing.T) {
+	// Tools run with cmd.Dir set elsewhere, so relative paths would break.
+	tools := ToolsFromRoot(filepath.Join("..", ".local"))
+	for _, p := range []string{tools.FFmpeg, tools.FFprobe, tools.TTS, tools.ModelDir, tools.FontsDir} {
+		if !filepath.IsAbs(p) {
+			t.Errorf("%s is not absolute", p)
+		}
+	}
+}
+
 func TestToolsMissing(t *testing.T) {
 	if len(ToolsFromRoot(t.TempDir()).Missing()) != 6 {
 		t.Fatal("all tools should be missing in an empty directory")
