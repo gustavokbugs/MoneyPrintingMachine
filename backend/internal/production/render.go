@@ -146,16 +146,22 @@ func filterPath(p string) string {
 	return strings.NewReplacer(`\`, `\\`, `'`, `\'`, `:`, `\:`, `,`, `\,`, `[`, `\[`, `]`, `\]`).Replace(p)
 }
 
-// FFmpegArgs renders a solid brand background, concatenated narration, and
-// burned-in subtitles. Paths in the filter graph are relative to the
-// working directory (the video folder) so no drive letters appear there.
-func FFmpegArgs(audios []string, total float64, width, height int, background, assFile, fontsDir, out string) []string {
+// FFmpegArgs combines the visual track, concatenated narration, and
+// burned-in subtitles. visual is a rendered scene video; when empty, a solid
+// brand background is generated instead. Paths in the filter graph are
+// relative to the working directory (the video folder) so no drive letters
+// appear there.
+func FFmpegArgs(visual string, audios []string, total float64, width, height int, background, assFile, fontsDir, out string) []string {
 	bg := strings.TrimPrefix(background, "#")
 	if len(bg) != 6 {
 		bg = "111827"
 	}
-	args := []string{"-y", "-hide_banner", "-loglevel", "error",
-		"-f", "lavfi", "-i", fmt.Sprintf("color=c=0x%s:s=%dx%d:r=30:d=%s", bg, width, height, strconv.FormatFloat(total+0.5, 'f', 2, 64))}
+	args := []string{"-y", "-hide_banner", "-loglevel", "error"}
+	if visual != "" {
+		args = append(args, "-i", visual)
+	} else {
+		args = append(args, "-f", "lavfi", "-i", fmt.Sprintf("color=c=0x%s:s=%dx%d:r=30:d=%s", bg, width, height, strconv.FormatFloat(total+0.5, 'f', 2, 64)))
+	}
 	for _, a := range audios {
 		args = append(args, "-i", a)
 	}
@@ -168,4 +174,15 @@ func FFmpegArgs(audios []string, total float64, width, height int, background, a
 		"-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
 		"-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-shortest", out)
 	return args
+}
+
+// WithoutTitles returns a copy of segs with the on-screen titles removed,
+// for when the visual track already shows them.
+func WithoutTitles(segs []Timed) []Timed {
+	out := make([]Timed, len(segs))
+	for i, s := range segs {
+		s.Title = ""
+		out[i] = s
+	}
+	return out
 }

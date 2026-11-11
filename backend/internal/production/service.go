@@ -62,6 +62,9 @@ func NewService(store Store, channels Channels, gen Generator, tools Tools, runn
 	return &Service{store: store, channels: channels, gen: gen, tools: tools, runner: runner, mediaDir: mediaDir, now: time.Now}
 }
 
+// AnimatedScenes reports whether HyperFrames scene rendering is available.
+func (s *Service) AnimatedScenes() bool { return s.tools.AnimatedScenes() }
+
 // ToolsMissing lists missing media tools (empty when ready).
 func (s *Service) ToolsMissing() []string { return s.tools.Missing() }
 
@@ -84,7 +87,7 @@ func (s *Service) CreateFromIdea(ctx context.Context, ownerID, channelID string,
 	target := min(max(idea.SuggestedDurationSecs, 15), 3600)
 	v := &Video{
 		OwnerID: ownerID, ChannelID: ch.ID, IdeaIndex: ideaIndex, Title: idea.WorkingTitle, Format: idea.Format,
-		AspectRatio: aspect, TargetSeconds: target, Status: StatusPlanned, VoiceID: 6,
+		AspectRatio: aspect, TargetSeconds: target, Status: StatusPlanned, VoiceID: 6, VisualStyle: StyleAuto,
 	}
 	if err := s.store.Create(ctx, v); err != nil {
 		return nil, err
@@ -356,6 +359,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	}
 	var segs []Timed
 	var audios []string
+	var kickers []string
 	total := 0.0
 	for i, seg := range segments {
 		wav, err := narrator.Synthesize(ctx, v.VoiceID, spoken[i])
@@ -371,16 +375,20 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 			title = seg.Heading
 		}
 		segs = append(segs, Timed{Audio: wav, Duration: d, Title: title, Text: seg.Narration})
+		kicker := ""
+		if seg.Heading != "" && seg.Heading != title {
+			kicker = seg.Heading
+		}
+		kickers = append(kickers, kicker)
 		audios = append(audios, wav)
 		total += d
 	}
 	width, height := v.Dimensions()
 	style := Style{Background: "#0F172A", Text: "#F8FAFC", Accent: "#60A5FA", Font: "Inter"}
+	secondary := "#1E3A8A"
 	if idn := ch.Identity; idn != nil {
 		style.Background, style.Text, style.Accent = idn.Palette.Primary, idn.Palette.Background, idn.Palette.Accent
-	}
-	if err := os.WriteFile(filepath.Join(dir, "captions.ass"), []byte(BuildASS(segs, width, height, style)), 0o644); err != nil {
-		return nil, fmt.Errorf("write subtitles: %w", err)
+		secondary = idn.Palette.Secondary
 	}
 	if err := os.WriteFile(filepath.Join(dir, "captions.srt"), []byte(BuildSRT(segs)), 0o644); err != nil {
 		return nil, fmt.Errorf("write captions: %w", err)
@@ -391,8 +399,34 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	}
 	rctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
+
+	// Animated scenes: render the picture with HyperFrames, then mix narration
+	// and captions over it. Fall back to the solid background if unavailable.
+	visual, visuals, note := "", "solid", ""
+	if s.tools.AnimatedScenes() {
+		resolved := ResolveStyle(v.VisualStyle, ch.Niche)
+		visual, err = s.renderScenes(rctx, dir, ProjectInput{
+			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
+			ChannelName: ch.Name, Scenes: PlanScenes(segs, kickers, ch.Name),
+		})
+		if err != nil {
+			visual, note = "", "Animated scenes failed, so a plain background was used: "+truncateErr(err, 300)
+		} else {
+			visuals = "animated:" + resolved
+		}
+	} else {
+		note = "Animated scenes are not installed (run npm install in renderer/)."
+	}
+	// Animated scenes already show section headings; keep only captions then.
+	assSegs := segs
+	if visual != "" {
+		assSegs = WithoutTitles(segs)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "captions.ass"), []byte(BuildASS(assSegs, width, height, style)), 0o644); err != nil {
+		return nil, fmt.Errorf("write subtitles: %w", err)
+	}
 	tmp := "video.tmp.mp4"
-	if _, err := s.runner.Run(rctx, dir, s.tools.FFmpeg, FFmpegArgs(audios, total, width, height, style.Background, "captions.ass", fontsRel, tmp)...); err != nil {
+	if _, err := s.runner.Run(rctx, dir, s.tools.FFmpeg, FFmpegArgs(visual, audios, total, width, height, style.Background, "captions.ass", fontsRel, tmp)...); err != nil {
 		_ = os.Remove(filepath.Join(dir, tmp))
 		return nil, fmt.Errorf("render video: %w", err)
 	}
@@ -406,7 +440,36 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	return &Output{
 		VideoFile: "video.mp4", CaptionsFile: "captions.srt", DurationSeconds: dur,
 		Width: width, Height: height, RenderedAt: s.now().UTC(), SyntheticVoice: true,
+		Visuals: visuals, VisualsNote: note,
 	}, nil
+}
+
+// renderScenes writes a HyperFrames project and renders it to visual.mp4
+// (picture only; narration and captions are added by FFmpeg afterwards).
+func (s *Service) renderScenes(ctx context.Context, dir string, in ProjectInput) (string, error) {
+	project := filepath.Join(dir, "scenes")
+	_ = os.RemoveAll(project)
+	if err := WriteProject(project, in, s.tools.GSAP, s.tools.WebFonts); err != nil {
+		return "", err
+	}
+	out := filepath.Join(dir, "visual.mp4")
+	_ = os.Remove(out)
+	if _, err := s.runner.Run(ctx, project, s.tools.Node, s.tools.HyperFrames, "render", project,
+		"--output", out, "--quality", "looks", "--fps", "30", "--quiet"); err != nil {
+		return "", fmt.Errorf("render scenes: %w", err)
+	}
+	if st, err := os.Stat(out); err != nil || st.Size() == 0 {
+		return "", errors.New("render scenes: no output file")
+	}
+	return out, nil
+}
+
+func truncateErr(err error, n int) string {
+	msg := err.Error()
+	if len(msg) > n {
+		return msg[:n]
+	}
+	return msg
 }
 
 // MediaPath resolves a downloadable file of a video. Only known file names
@@ -427,4 +490,18 @@ func (s *Service) MediaPath(ctx context.Context, ownerID, id, name string) (stri
 		return "", ErrNotFound
 	}
 	return p, nil
+}
+
+// SetStyle chooses the visual style of the animated scenes.
+func (s *Service) SetStyle(ctx context.Context, ownerID, id, style string) (*Video, error) {
+	if !ValidStyle(style) {
+		return nil, &channel.ValidationError{Field: "visualStyle", Message: "is not a known style"}
+	}
+	return s.mutate(ctx, ownerID, id, func(v *Video) error {
+		if v.Status == StatusProducing {
+			return &StateError{Status: v.Status, Action: "change the style", Reason: "production is running"}
+		}
+		v.VisualStyle = style
+		return nil
+	})
 }

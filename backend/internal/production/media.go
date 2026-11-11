@@ -27,6 +27,43 @@ type Tools struct {
 	TTS      string // sherpa-onnx-offline-tts executable
 	ModelDir string // Kokoro model directory
 	FontsDir string // directory with Inter TTF files
+
+	// Animated scenes (optional): Node runs the HyperFrames CLI from the
+	// renderer workspace; GSAP and web fonts are vendored there.
+	Node        string
+	HyperFrames string
+	GSAP        string
+	WebFonts    string
+}
+
+// WithRenderer adds the HyperFrames workspace at dir (the repository's
+// renderer folder) when Node and the installed packages are present.
+func (t Tools) WithRenderer(dir string) Tools {
+	if abs, err := filepath.Abs(dir); err == nil {
+		dir = abs
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		return t
+	}
+	t.Node = node
+	t.HyperFrames = filepath.Join(dir, "node_modules", "hyperframes", "bin", "hyperframes.mjs")
+	t.GSAP = filepath.Join(dir, "node_modules", "gsap", "dist", "gsap.min.js")
+	t.WebFonts = filepath.Join(dir, "node_modules", "@fontsource")
+	return t
+}
+
+// AnimatedScenes reports whether HyperFrames rendering is available.
+func (t Tools) AnimatedScenes() bool {
+	if t.Node == "" {
+		return false
+	}
+	for _, p := range []string{t.HyperFrames, t.GSAP, filepath.Join(t.WebFonts, "inter")} {
+		if _, err := os.Stat(p); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 // ToolsFromRoot returns the default layout created by the setup script

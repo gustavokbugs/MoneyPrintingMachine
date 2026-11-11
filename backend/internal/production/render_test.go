@@ -50,12 +50,16 @@ func TestBuildSRT(t *testing.T) {
 }
 
 func TestFFmpegArgs(t *testing.T) {
-	args := FFmpegArgs([]string{"C:/cache/a.wav", "C:/cache/b.wav"}, 12.3, 1080, 1920, "#0F172A", "captions.ass", `..\..\fonts`, "video.mp4")
+	args := FFmpegArgs("", []string{"C:/cache/a.wav", "C:/cache/b.wav"}, 12.3, 1080, 1920, "#0F172A", "captions.ass", `..\..\fonts`, "video.mp4")
 	joined := strings.Join(args, " ")
 	for _, want := range []string{"color=c=0x0F172A:s=1080x1920:r=30:d=12.80", "[1:a][2:a]concat=n=2", "fontsdir='../../fonts'", "-c:v libx264", "video.mp4"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("missing %q in %s", want, joined)
 		}
+	}
+	animated := strings.Join(FFmpegArgs("visual.mp4", []string{"a.wav"}, 5, 1920, 1080, "#000000", "c.ass", "f", "o.mp4"), " ")
+	if !strings.Contains(animated, "-i visual.mp4") || strings.Contains(animated, "lavfi") {
+		t.Fatalf("animated visual must replace the solid background: %s", animated)
 	}
 	if filterPath("a:b,c'd") != `a\:b\,c\'d` {
 		t.Fatalf("filterPath = %s", filterPath("a:b,c'd"))
@@ -134,5 +138,19 @@ func TestToolsFromRootIsAbsolute(t *testing.T) {
 func TestToolsMissing(t *testing.T) {
 	if len(ToolsFromRoot(t.TempDir()).Missing()) != 6 {
 		t.Fatal("all tools should be missing in an empty directory")
+	}
+}
+
+func TestWithoutTitlesDropsTitleCards(t *testing.T) {
+	segs := []Timed{{Duration: 2, Title: "Tidal Pull", Text: "Friction slows Earth."}}
+	ass := BuildASS(WithoutTitles(segs), 1080, 1920, Style{})
+	if strings.Contains(ass, ",Title,,") {
+		t.Fatal("title card still present")
+	}
+	if !strings.Contains(ass, "Friction slows Earth.") {
+		t.Fatal("captions missing")
+	}
+	if segs[0].Title != "Tidal Pull" {
+		t.Fatal("input mutated")
 	}
 }
