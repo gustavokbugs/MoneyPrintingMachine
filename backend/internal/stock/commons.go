@@ -224,29 +224,60 @@ func (c *Commons) Search(ctx context.Context, query, _ string, width, height, pe
 	return preferRelevant(clips, query), nil
 }
 
-// preferRelevant keeps photos whose title shares a word (3+ letters) with
-// the query; Commons full-text search also matches descriptions, which
-// often gives off-topic images. All are kept when none match.
+// preferRelevant keeps photos whose title shares a content word with the
+// query, best matches first. Commons full-text search also matches
+// descriptions, which often gives off-topic images, so photos with no
+// shared word are dropped. Years, months, and filler words do not count:
+// "September 1928" alone matches anything from that date.
 func preferRelevant(clips []Clip, query string) []Clip {
 	words := map[string]bool{}
-	for _, w := range strings.Fields(strings.ToLower(query)) {
-		if len(w) >= 3 {
-			words[strings.TrimSuffix(w, "s")] = true
-		}
+	for _, w := range titleWords(query) {
+		words[w] = true
 	}
-	var keep []Clip
+	type scored struct {
+		clip  Clip
+		score int
+	}
+	var keep []scored
 	for _, c := range clips {
-		for _, w := range strings.FieldsFunc(strings.ToLower(c.Title), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
-			if words[strings.TrimSuffix(w, "s")] {
-				keep = append(keep, c)
-				break
+		score, seen := 0, map[string]bool{}
+		for _, w := range titleWords(c.Title) {
+			if words[w] && !seen[w] {
+				seen[w] = true
+				score++
 			}
 		}
+		if score > 0 {
+			keep = append(keep, scored{c, score})
+		}
 	}
-	if len(keep) == 0 {
-		return clips
+	sort.SliceStable(keep, func(i, j int) bool { return keep[i].score > keep[j].score })
+	out := make([]Clip, len(keep))
+	for i, k := range keep {
+		out[i] = k.clip
 	}
-	return keep
+	return out
+}
+
+// noMatchWords never make a photo relevant on their own.
+var noMatchWords = map[string]bool{
+	"the": true, "and": true, "for": true, "with": true, "from": true, "into": true, "that": true, "this": true,
+	"old": true, "new": true, "first": true, "photo": true, "image": true, "file": true, "view": true,
+	"january": true, "february": true, "march": true, "april": true, "may": true, "june": true, "july": true,
+	"august": true, "september": true, "october": true, "november": true, "december": true,
+}
+
+// titleWords returns lower-case content words of 3+ letters, singular,
+// without numbers or filler words.
+func titleWords(s string) []string {
+	var out []string
+	for _, w := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if len([]rune(w)) < 3 || noMatchWords[w] || strings.IndexFunc(w, unicode.IsLetter) < 0 {
+			continue
+		}
+		out = append(out, strings.TrimSuffix(w, "s"))
+	}
+	return out
 }
 
 // Download stores the image under dir, cached by its URL hash.

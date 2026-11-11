@@ -78,8 +78,17 @@ func TestPreferRelevantTitles(t *testing.T) {
 	if len(got) != 2 || got[0].ID != 2 || got[1].ID != 3 {
 		t.Errorf("got %+v", got)
 	}
-	if len(preferRelevant(clips, "zz")) != 3 {
-		t.Error("no matches should keep everything")
+	if len(preferRelevant(clips, "zz")) != 0 {
+		t.Error("photos without a shared word must be dropped")
+	}
+	// Dates and filler words never match; more shared words rank first.
+	dated := []Clip{{ID: 1, Title: "Ataturk-September 20, 1928"}, {ID: 2, Title: "Mold on a petri dish"}, {ID: 3, Title: "Penicillin mold on a petri dish, 1928"}}
+	got = preferRelevant(dated, "penicillin mold september 1928")
+	if len(got) != 2 || got[0].ID != 3 || got[1].ID != 2 {
+		t.Errorf("dated: got %+v", got)
+	}
+	if len(preferRelevant(dated, "september 1928")) != 0 {
+		t.Error("a date-only query must not match")
 	}
 }
 
