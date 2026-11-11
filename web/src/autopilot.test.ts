@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asAutopilotResult } from "./api/guards";
+import { asAutopilotResult, asStoryFormats } from "./api/guards";
 
 describe("asAutopilotResult", () => {
   it("keeps only string entries", () => {
@@ -37,5 +37,14 @@ describe("dialogue modes", () => {
     expect(speakerRole(modes, v, "B")).toBe("Expert");
     expect(speakerRole(modes, v, undefined)).toBe("Host");
     expect(speakerRole(modes, { dialogueMode: "narration" } as Video, "B")).toBe("");
+  });
+});
+
+describe("asStoryFormats", () => {
+  it("keeps well-formed formats and always offers the explainer", () => {
+    const got = asStoryFormats([{ id: "escalation", name: "Absurd escalation", example: "You...", seconds: 35 }, { id: 3 }, "x"]);
+    expect(got.map((f) => f.id)).toEqual(["explainer", "escalation"]);
+    expect(got[1]?.seconds).toBe(35);
+    expect(asStoryFormats(undefined).map((f) => f.id)).toEqual(["explainer"]);
   });
 });

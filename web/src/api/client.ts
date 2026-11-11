@@ -6,6 +6,7 @@ import {
   asVisualStyles,
   isRecord,
   asDialogueModes,
+  asStoryFormats,
 } from "./guards";
 import type {
   Blueprint,
@@ -199,7 +200,7 @@ export const api = {
   productionStatus: async (): Promise<ProductionStatus> => {
     const raw = await request("GET", "/api/production/status");
     const status = asRecordOf<ProductionStatus>("production status", ["ready", "missing", "voices"])(raw);
-    return { ...status, styles: asVisualStyles(isRecord(raw) ? raw.styles : undefined), animatedScenes: status.animatedScenes === true, stockFootage: status.stockFootage === true, dialogueModes: asDialogueModes(isRecord(raw) ? raw.dialogueModes : undefined) };
+    return { ...status, styles: asVisualStyles(isRecord(raw) ? raw.styles : undefined), animatedScenes: status.animatedScenes === true, stockFootage: status.stockFootage === true, dialogueModes: asDialogueModes(isRecord(raw) ? raw.dialogueModes : undefined), storyFormats: asStoryFormats(isRecord(raw) ? raw.storyFormats : undefined) };
   },
   listVideos: async (channelId: string) =>
     asItems(await request("GET", `/api/channels/${encodeURIComponent(channelId)}/videos`), asRecordOf<Video>("video", ["id", "status"])),
@@ -213,6 +214,8 @@ export const api = {
   approveVideo: async (id: string) => asRecordOf<Video>("video", ["id", "status"])(await request("POST", `/api/videos/${encodeURIComponent(id)}/approve`)),
   setVoice: async (id: string, voiceId: number) =>
     asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/voice`, { voiceId })),
+  setStoryFormat: async (id: string, storyFormat: string) =>
+    asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/story-format`, { storyFormat })),
   setDialogue: async (id: string, dialogueMode: string, voiceB: number) =>
     asRecordOf<Video>("video", ["id", "status"])(await request("PUT", `/api/videos/${encodeURIComponent(id)}/dialogue`, { dialogueMode, voiceB })),
   setVisualStyle: async (id: string, visualStyle: VisualStyle) =>

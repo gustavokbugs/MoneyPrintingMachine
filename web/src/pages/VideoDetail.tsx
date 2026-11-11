@@ -12,6 +12,7 @@ import { useJob } from "../hooks/useJob";
 import { formatDateTime, formatDuration, t } from "../i18n";
 import { VideoStatusBadge } from "./ChannelVideos";
 import { DialogueControls, speakerRole } from "../components/DialogueControls";
+import { StoryFormatControls } from "../components/StoryFormatControls";
 
 function useVideoJob(video: Video, start: (key: string) => ReturnType<typeof api.generateVideoScript>, doneMessage: string) {
   const qc = useQueryClient();
@@ -144,6 +145,7 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
           </Button>
         }
       >
+        <StoryFormatControls video={v} tools={tools} disabled={busy} onSaved={setVideo} />
         <DialogueControls video={v} tools={tools} disabled={busy} onSaved={setVideo} />
         {scriptJob.jobId && <JobProgress job={scriptJob.job.data} error={scriptJob.job.error} />}
         {!sc ? (

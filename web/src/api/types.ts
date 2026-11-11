@@ -386,6 +386,8 @@ export interface Video {
   visualStyle: VisualStyle;
   dialogueMode: string;
   voiceB: number;
+  /** How the script tells the story (explainer or a short viral format). */
+  storyFormat: string;
   script: VideoScript | null;
   output: VideoOutput | null;
   version: number;
@@ -401,6 +403,16 @@ export interface ProductionStatus {
   animatedScenes: boolean;
   stockFootage: boolean;
   dialogueModes: DialogueModeInfo[];
+  storyFormats: StoryFormatInfo[];
+}
+
+/** StoryFormatInfo is one way to tell a video's story. */
+export interface StoryFormatInfo {
+  id: string;
+  name: string;
+  example: string;
+  /** Length in seconds the format sets (0 keeps the current one). */
+  seconds: number;
 }
 
 /** DialogueModeInfo is one script format and its speaker roles. */
