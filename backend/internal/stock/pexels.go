@@ -177,15 +177,11 @@ func (c *Client) Download(ctx context.Context, clip Clip, dir string) (string, e
 	return download(ctx, c.http, clip, dir, "")
 }
 
-// download fetches an allowed HTTPS file with a size cap into dir, named
-// by provider and IDs so repeated renders reuse it.
-func download(ctx context.Context, hc *http.Client, clip Clip, dir, ua string) (string, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("create stock cache: %w", err)
-	}
+// cachePath validates the clip's file URL and names its file in dir.
+func cachePath(clip Clip, dir string) (*url.URL, string, error) {
 	u, err := url.Parse(clip.FileURL)
 	if err != nil || !allowedFileHost(u) {
-		return "", fmt.Errorf("clip %d has an unexpected file URL", clip.ID)
+		return nil, "", fmt.Errorf("clip %d has an unexpected file URL", clip.ID)
 	}
 	ext := strings.ToLower(filepath.Ext(u.Path))
 	if ext != ".mp4" && ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
@@ -198,9 +194,34 @@ func download(ctx context.Context, hc *http.Client, clip Clip, dir, ua string) (
 	if provider == "" {
 		provider = ProviderPexels
 	}
-	out := filepath.Join(dir, fmt.Sprintf("%s-%d-%d%s", provider, clip.ID, clip.FileID, ext))
+	return u, filepath.Join(dir, fmt.Sprintf("%s-%d-%d%s", provider, clip.ID, clip.FileID, ext)), nil
+}
+
+// Cached returns the clip's file in dir when an earlier render downloaded
+// it, so it can be used without a request.
+func Cached(clip Clip, dir string) (string, bool) {
+	_, out, err := cachePath(clip, dir)
+	if err != nil {
+		return "", false
+	}
+	if st, err := os.Stat(out); err == nil && st.Size() > 0 {
+		return out, true
+	}
+	return "", false
+}
+
+// download fetches an allowed HTTPS file with a size cap into dir, named
+// by provider and IDs so repeated renders reuse it.
+func download(ctx context.Context, hc *http.Client, clip Clip, dir, ua string) (string, error) {
+	u, out, err := cachePath(clip, dir)
+	if err != nil {
+		return "", err
+	}
 	if st, err := os.Stat(out); err == nil && st.Size() > 0 {
 		return out, nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create stock cache: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {

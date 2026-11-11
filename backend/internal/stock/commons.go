@@ -286,6 +286,9 @@ func titleWords(s string) []string {
 // servers rate-limit bursts too, so downloads are paced like searches and
 // retried once after a 429.
 func (c *Commons) Download(ctx context.Context, clip Clip, dir string) (string, error) {
+	if path, ok := Cached(clip, dir); ok {
+		return path, nil // no request, so no pacing
+	}
 	for attempt := 0; ; attempt++ {
 		if err := c.wait(ctx); err != nil {
 			return "", err

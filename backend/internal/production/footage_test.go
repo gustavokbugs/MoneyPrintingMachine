@@ -283,3 +283,31 @@ func TestPlanFootageSkipsBlockedClips(t *testing.T) {
 		}
 	}
 }
+
+// Once downloads are rate-limited, clips saved by earlier renders are used.
+func TestPlanFootageUsesCachedClipsWhenRateLimited(t *testing.T) {
+	limited := fmt.Errorf("download: %w", stock.ErrRateLimited)
+	clip := func(id int64) stock.Clip {
+		return stock.Clip{Provider: stock.ProviderCommons, ID: id, Image: true, Duration: 10, FileURL: fmt.Sprintf("https://upload.wikimedia.org/%d.jpg", id)}
+	}
+	pool := []stock.Clip{clip(1), clip(2), clip(3), clip(4), clip(5)}
+	f := &fakeFootage{results: map[string][]stock.Clip{"mold": pool}, failDownload: map[int64]error{1: limited, 2: limited, 3: limited, 4: limited, 5: limited}}
+	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
+	svc.WithFootage(f)
+	cache := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cache, "commons-5-0.jpg"), []byte("jpeg"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if p, ok := stock.Cached(clip(5), cache); !ok || p == "" {
+		t.Fatalf("cache naming changed: %q %v", p, ok)
+	}
+	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"mold"}}, "", 1080, 1920, cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range shots {
+		if s.Clip.ID != 5 {
+			t.Errorf("shot uses clip %d, want the cached clip 5", s.Clip.ID)
+		}
+	}
+}

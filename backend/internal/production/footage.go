@@ -241,6 +241,17 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 				downloaded = append(downloaded, shot)
 				break
 			}
+			if shot.Path == "" && limits >= maxRateLimits {
+				// Rate-limited: prefer an unused clip saved by an earlier render.
+				for _, clip := range pool {
+					if path, ok := stock.Cached(clip, cacheDir); ok && !used[clipKey(clip)] {
+						used[clipKey(clip)] = true
+						shot.Clip, shot.Path = clip, path
+						downloaded = append(downloaded, shot)
+						break
+					}
+				}
+			}
 			shots = append(shots, shot)
 		}
 	}
