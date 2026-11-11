@@ -110,6 +110,7 @@ func TestKeepAliveIsSent(t *testing.T) {
 	if got["keep_alive"] != "30s" {
 		t.Errorf("keep_alive = %v", got["keep_alive"])
 	}
+	got = nil // decoding into a reused map would keep the old key
 	plain, _ := NewClient(srv.URL, "qwen3:4b", 5*time.Second)
 	_ = plain.GenerateJSON(context.Background(), Request{Messages: []Message{{Role: "user", Content: "hi"}}, Schema: json.RawMessage(`{"type":"object"}`)}, &out)
 	if _, ok := got["keep_alive"]; ok {
