@@ -422,7 +422,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	if s.tools.AnimatedScenes() {
 		visual, err = s.renderScenes(rctx, dir, ProjectInput{
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
-			ChannelName: ch.Name, Scenes: scenes, Captions: CaptionTrack(segs, captionWords(width, height)), Seed: seedOf(v.ID),
+			ChannelName: ch.Name, Scenes: scenes, Captions: captionsFor(resolved, segs, width, height), Seed: seedOf(v.ID),
 		})
 		if err != nil {
 			visual, note = "", "Animated scenes failed, so a plain background was used: "+truncateErr(err, 300)
@@ -447,7 +447,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	if err := ComposeMusic(mood, total+1, v.ID+":"+mood.Name).WriteWAV(filepath.Join(dir, mix.Music)); err != nil {
 		return nil, fmt.Errorf("compose music: %w", err)
 	}
-	effects := PlanEffects(scenes)
+	effects := PlanEffects(scenes, resolved)
 	if visual == "" {
 		// Without animated scenes there are no transitions to accent.
 		effects = nil
@@ -474,6 +474,15 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		Music:        "Original score generated in code (" + mood.Description + "); no third-party audio.",
 		SoundEffects: len(effects),
 	}, nil
+}
+
+// captionsFor picks the caption layout: one word at a time for the
+// gameplay story, short lines with a highlighted word otherwise.
+func captionsFor(style string, segs []Timed, width, height int) []CaptionChunk {
+	if style == StyleGameplay {
+		return WordCaptions(segs)
+	}
+	return CaptionTrack(segs, captionWords(width, height))
 }
 
 // captionWords is the caption line length: short punchy lines for

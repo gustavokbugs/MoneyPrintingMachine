@@ -148,6 +148,8 @@ var moods = map[string]Mood{
 		Chords: [][]int{{45, 52, 57, 60}, {41, 48, 53, 57}, {48, 52, 55, 60}, {43, 50, 55, 59}}},
 	StyleBold: {Name: "driving", BPM: 100, Cutoff: 2200, Arp: 2, Kick: 4, Hats: true, Description: "upbeat, driving pulse",
 		Chords: [][]int{{50, 53, 57, 62}, {46, 50, 53, 58}, {41, 48, 53, 57}, {48, 52, 55, 60}}},
+	StyleGameplay: {Name: "lofi", BPM: 78, Cutoff: 1100, Arp: 1, Kick: 2, Hats: true, Description: "laid-back lo-fi chords with a soft beat",
+		Chords: [][]int{{50, 53, 57, 64}, {43, 53, 57, 59}, {48, 52, 55, 62}, {45, 52, 55, 60}}},
 	StyleTech: {Name: "pulse", BPM: 110, Cutoff: 2600, Arp: 4, Kick: 2, Hats: true, Description: "electronic pulse with fast arpeggios",
 		Chords: [][]int{{52, 55, 59, 64}, {48, 52, 55, 60}, {43, 50, 55, 59}, {50, 54, 57, 62}}},
 }
@@ -410,7 +412,20 @@ type SFXCue struct {
 // PlanEffects places effects on scene changes: an impact on the opening
 // title, a whoosh into each new scene, ticks while counters run, and a
 // chime on the outro. Times match the scene animations in scenes_html.go.
-func PlanEffects(scenes []Scene) []SFXCue {
+// The gameplay story has no scene cuts, only the hook card and the closing
+// follow prompt (story_html.go).
+func PlanEffects(scenes []Scene, style string) []SFXCue {
+	if style == StyleGameplay {
+		if len(scenes) == 0 {
+			return nil
+		}
+		cues := []SFXCue{{At: 0.05, Kind: SFXImpact}}
+		last := scenes[len(scenes)-1]
+		if total := last.Start + last.Duration; total > 4 {
+			cues = append(cues, SFXCue{At: total - 3 + 0.05, Kind: SFXChime})
+		}
+		return cues
+	}
 	var cues []SFXCue
 	for i, s := range scenes {
 		switch {

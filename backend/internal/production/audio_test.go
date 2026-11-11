@@ -58,7 +58,7 @@ func TestPlanEffectsFollowsScenes(t *testing.T) {
 		{Duration: 5, Title: "Tidal Pull", Text: "y"},
 		{Duration: 3, Text: "Bye."},
 	}, nil, "Quiet Orbit")
-	cues := PlanEffects(scenes)
+	cues := PlanEffects(scenes, StyleTech)
 	count := map[string]int{}
 	for _, c := range cues {
 		count[c.Kind]++
@@ -118,5 +118,16 @@ func TestFFmpegArgsMixesSoundtrack(t *testing.T) {
 	voiceOnly := strings.Join(FFmpegArgs("", AudioMix{Voice: []string{"a.wav"}}, 3, 1080, 1920, "#000000", "c.ass", "f", "o.mp4"), " ")
 	if strings.Contains(voiceOnly, "sidechain") || !strings.Contains(voiceOnly, "[voice];[voice]amix=inputs=1") {
 		t.Fatalf("voice-only mix: %s", voiceOnly)
+	}
+}
+
+func TestPlanEffectsGameplayHasNoCutSounds(t *testing.T) {
+	scenes := []Scene{{Kind: SceneTitle, Start: 0, Duration: 4}, {Kind: SceneStatement, Start: 4, Duration: 4}, {Kind: SceneOutro, Start: 8, Duration: 3}}
+	cues := PlanEffects(scenes, StyleGameplay)
+	if len(cues) != 2 || cues[0].Kind != SFXImpact || cues[1].Kind != SFXChime || math.Abs(cues[1].At-8.05) > 1e-9 {
+		t.Fatalf("cues = %+v", cues)
+	}
+	if PlanEffects(nil, StyleGameplay) != nil {
+		t.Error("no scenes should give no cues")
 	}
 }

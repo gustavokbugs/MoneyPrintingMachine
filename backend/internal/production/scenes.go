@@ -20,6 +20,7 @@ const (
 	StyleDocumentary = "documentary"
 	StyleBold        = "bold"
 	StyleTech        = "tech"
+	StyleGameplay    = "gameplay"
 )
 
 // Styles lists selectable styles with descriptions for the UI.
@@ -33,6 +34,7 @@ var Styles = []struct {
 	{StyleDocumentary, "Documentary", "Serif titles, film grain, and slow camera drift. Good for history and true stories."},
 	{StyleBold, "Bold", "Huge type, strong color bands, and big counters. Good for finance and business."},
 	{StyleTech, "Tech", "Monospace details over a moving grid. Good for science, space, and AI."},
+	{StyleGameplay, "Gameplay story", "An original game-style run in the background with one big word at a time in the middle. Good for stories and quick facts."},
 }
 
 // ValidStyle reports whether s is a known style.
@@ -210,6 +212,8 @@ type CaptionWord struct {
 type CaptionChunk struct {
 	Start, End float64
 	Words      []CaptionWord
+	// Hot marks a chunk to highlight (a number or a long key word).
+	Hot bool
 }
 
 // CaptionTrack splits narration into short caption lines with an estimated
@@ -231,6 +235,46 @@ func CaptionTrack(segs []Timed, maxWords int) []CaptionChunk {
 		out = append(out, ch)
 	}
 	return out
+}
+
+// WordCaptions shows the narration one word at a time. A very short word
+// (three letters or fewer) is paired with the next one so the screen does
+// not flicker, unless the pair would be too long or a sentence ends.
+func WordCaptions(segs []Timed) []CaptionChunk {
+	var out []CaptionChunk
+	cues := Cues(segs, 1)
+	for i := 0; i < len(cues); i++ {
+		c := cues[i]
+		ch := CaptionChunk{Start: c.Start, End: c.End, Words: []CaptionWord{{Text: c.Text, At: c.Start}}}
+		word := strings.Trim(c.Text, captionPunct)
+		if i+1 < len(cues) && len([]rune(word)) <= 3 && word == c.Text &&
+			len([]rune(c.Text))+1+len([]rune(cues[i+1].Text)) <= 12 && cues[i+1].Start-c.End < 0.01 {
+			n := cues[i+1]
+			ch.Words = append(ch.Words, CaptionWord{Text: n.Text, At: n.Start})
+			ch.End = n.End
+			i++
+		}
+		for _, w := range ch.Words {
+			clean := strings.Trim(w.Text, captionPunct)
+			if strings.ContainsAny(clean, "0123456789") || len([]rune(clean)) >= 8 {
+				ch.Hot = true
+			}
+		}
+		out = append(out, ch)
+	}
+	return out
+}
+
+const captionPunct = ".,!?;:\"'()…"
+
+// captionFontUnits sizes a centered caption so its longest word fits the
+// frame width (about 90 units; a bold glyph is about 0.62 em wide).
+func captionFontUnits(c CaptionChunk) float64 {
+	longest := 1
+	for _, w := range c.Words {
+		longest = max(longest, len([]rune(w.Text)))
+	}
+	return math.Min(12.5, 90/(0.62*float64(longest)))
 }
 
 // ProjectInput is everything needed to write a HyperFrames project.
@@ -303,8 +347,12 @@ func WriteProject(dir string, in ProjectInput, gsapPath, fontsPkgDir string) err
 		}
 		v.CaptionData = append(v.CaptionData, d)
 	}
+	tmpl := projectTemplate
+	if in.Style == StyleGameplay {
+		tmpl = storyTemplate
+	}
 	var b bytes.Buffer
-	if err := projectTemplate.Execute(&b, v); err != nil {
+	if err := tmpl.Execute(&b, v); err != nil {
 		return fmt.Errorf("render project template: %w", err)
 	}
 	return os.WriteFile(filepath.Join(dir, "index.html"), b.Bytes(), 0o644)
@@ -334,7 +382,9 @@ func copyFile(src, dst string) error {
 	return out.Close()
 }
 
-var projectTemplate = template.Must(template.New("index").Funcs(template.FuncMap{
+var projectTemplate = template.Must(template.New("index").Funcs(templateFuncs).Parse(projectHTML))
+
+var templateFuncs = template.FuncMap{
 	"unit":    func(u float64) template.CSS { return template.CSS(strconv.FormatFloat(u, 'f', 2, 64) + "px") },
 	"bg":      func(v projectView) template.CSS { return cssColor(v.Palette.Background, "#0F172A") },
 	"ink":     func(v projectView) template.CSS { return cssColor(v.Palette.Text, "#F8FAFC") },
@@ -344,4 +394,7 @@ var projectTemplate = template.Must(template.New("index").Funcs(template.FuncMap
 	"sid":     func(i int) string { return fmt.Sprintf("s%d", i) },
 	"cid":     func(i int) string { return fmt.Sprintf("c%d", i) },
 	"wid":     func(i, j int) string { return fmt.Sprintf("c%dw%d", i, j) },
-}).Parse(projectHTML))
+	"capsize": func(c CaptionChunk) template.CSS {
+		return template.CSS("font-size: calc(var(--u) * " + strconv.FormatFloat(captionFontUnits(c), 'f', 2, 64) + ")")
+	},
+}

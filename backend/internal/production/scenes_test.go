@@ -1,6 +1,7 @@
 package production
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -165,5 +166,80 @@ func TestWriteProjectRendersCaptionsSafely(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing %q", want)
 		}
+	}
+}
+
+func TestWordCaptionsShowOneWordAndPairShortOnes(t *testing.T) {
+	segs := []Timed{{Duration: 4, Text: "It is 1,200 kilometers away."}, {Duration: 2, Text: "Wow. A dog"}}
+	got := WordCaptions(segs)
+	var texts []string
+	for _, c := range got {
+		var ws []string
+		for _, w := range c.Words {
+			ws = append(ws, w.Text)
+		}
+		texts = append(texts, strings.Join(ws, " "))
+	}
+	// "It is" pairs; "1,200" is hot; "Wow." ends a sentence so it stays alone;
+	// "A dog" pairs within the second segment.
+	want := []string{"It is", "1,200", "kilometers", "away.", "Wow.", "A dog"}
+	if strings.Join(texts, "|") != strings.Join(want, "|") {
+		t.Fatalf("captions = %q, want %q", texts, want)
+	}
+	if !got[1].Hot || !got[2].Hot || got[0].Hot {
+		t.Errorf("hot flags wrong: %+v", got)
+	}
+	for i := 1; i < len(got); i++ {
+		if got[i].Start < got[i-1].End-1e-9 {
+			t.Errorf("caption %d overlaps the previous one", i)
+		}
+	}
+	if end := got[len(got)-1].End; math.Abs(end-6) > 1e-6 {
+		t.Errorf("captions end at %v, want 6", end)
+	}
+}
+
+func TestCaptionFontFitsLongWords(t *testing.T) {
+	short := captionFontUnits(CaptionChunk{Words: []CaptionWord{{Text: "yes"}}})
+	long := captionFontUnits(CaptionChunk{Words: []CaptionWord{{Text: "electromagnetically"}}})
+	if short != 12.5 {
+		t.Errorf("short word size = %v, want the 12.5 cap", short)
+	}
+	if long*0.62*19 > 90.01 {
+		t.Errorf("long word overflows: %v units", long)
+	}
+}
+
+func TestWriteProjectGameplayStory(t *testing.T) {
+	root := t.TempDir()
+	gsap := filepath.Join(root, "gsap.min.js")
+	_ = os.WriteFile(gsap, []byte("/*gsap*/"), 0o644)
+	fonts := filepath.Join(root, "fontsource")
+	for _, f := range projectFonts {
+		p := filepath.Join(fonts, f.pkg, "files", f.file)
+		_ = os.MkdirAll(filepath.Dir(p), 0o755)
+		_ = os.WriteFile(p, []byte("font"), 0o644)
+	}
+	segs := []Timed{{Duration: 3, Title: "<i>Hook</i>", Text: `Lasers <b>hit</b> it.`}, {Duration: 3, Text: "Then 42 more."}}
+	dir := filepath.Join(root, "project")
+	in := ProjectInput{Width: 1080, Height: 1920, Style: StyleGameplay, ChannelName: "<script>x</script>",
+		Scenes: PlanScenes(segs, nil, "Q"), Captions: WordCaptions(segs), Seed: 7}
+	if err := WriteProject(dir, in, gsap, fonts); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "index.html"))
+	html := string(b)
+	for _, bad := range []string{"<b>hit</b>", "<i>Hook</i>", "<script>x</script>"} {
+		if strings.Contains(html, bad) {
+			t.Errorf("unescaped %q", bad)
+		}
+	}
+	for _, want := range []string{`<canvas id="game"`, `id="hook"`, `class="cap hot"`, `font-size: calc(var(--u) * 12.50)`, `window.__timelines["main"]`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if strings.Contains(html, `class="style-`) {
+		t.Error("gameplay story used the scene template")
 	}
 }
