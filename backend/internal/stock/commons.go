@@ -211,6 +211,9 @@ func (c *Commons) Search(ctx context.Context, query, _ string, width, height, pe
 		if title == "" {
 			title = strings.TrimSuffix(strings.TrimPrefix(p.Title, "File:"), ".jpg")
 		}
+		if Sensitive(title + " " + p.Title) {
+			continue
+		}
 		out = append(out, ranked{index: p.Index, clip: Clip{
 			Provider: ProviderCommons, ID: p.PageID, PageURL: ii.DescURL, Author: author,
 			License: plainText(ii.Meta["LicenseShortName"].Value), Title: title, Image: true,
@@ -259,6 +262,23 @@ func preferRelevant(clips []Clip, query string) []Clip {
 		out[i] = k.clip
 	}
 	return out
+}
+
+// sensitiveWords mark images unfit for a general audience or likely to
+// be misread (graphic injuries, hate symbols, nudity), judged by title.
+var sensitiveWords = []string{"wound", "injur", "gunshot", "corpse", "cadaver", "autopsy", "surgery", "surgical", "dissect",
+	"blood", "gore", "dead body", "execution", "lynch", "massacre", "swastika", "nazi", "hitler", "ss officer",
+	"nude", "naked", "erotic", "pornograph", "genital", "fetus", "tumor", "lesion", "disease specimen", "pathology"}
+
+// Sensitive reports whether a title names something unfit to show.
+func Sensitive(title string) bool {
+	t := strings.ToLower(title)
+	for _, w := range sensitiveWords {
+		if strings.Contains(t, w) {
+			return true
+		}
+	}
+	return false
 }
 
 // noMatchWords never make a photo relevant on their own.

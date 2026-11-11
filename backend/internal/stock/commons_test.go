@@ -170,3 +170,16 @@ func TestCommonsDownloadRetriesRateLimitOnce(t *testing.T) {
 		t.Fatalf("err=%v calls=%d, want ErrRateLimited after one retry", err, calls)
 	}
 }
+
+func TestSensitiveTitles(t *testing.T) {
+	for _, bad := range []string{"Gunshot wound of the brain", "Nazi rally 1936", "Surgical instruments in use"} {
+		if !Sensitive(bad) {
+			t.Errorf("%q should be sensitive", bad)
+		}
+	}
+	for _, ok := range []string{"Petri dish with mold", "Apple II computer", "Floppy disk"} {
+		if Sensitive(ok) {
+			t.Errorf("%q should be fine", ok)
+		}
+	}
+}
