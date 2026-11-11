@@ -476,7 +476,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	captions := captionsFor(resolved, segs, width, height)
 	var build *BuildData
 	if resolved == StyleBuild3D && s.tools.AnimatedScenes() {
-		build = s.planBuild(rctx, segs, seedOf(v.ID))
+		build = buildTiming(segs, sceneFor(v))
 	}
 	if storyStyle(resolved) && s.tools.AnimatedScenes() {
 		// Key words: a photo pops up on each fix word, and captions color

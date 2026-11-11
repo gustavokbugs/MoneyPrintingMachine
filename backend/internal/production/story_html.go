@@ -79,7 +79,7 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
 </div>
 {{if .BuildJSON}}<script>window.BUILD = {{.BuildJSON}};</script>
 <script src="assets/three.js"></script>
-<script src="assets/build3d.js"></script>
+<script src="assets/scene.js"></script>
 {{end}}<script>
 (function () {
   var CAPS = {{.CaptionData}};
@@ -269,11 +269,11 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
     draw(0);
     tl.to(clock, { t: TOTAL, duration: TOTAL, ease: "none", onUpdate: function () { draw(clock.t); } }, 0);
   }
-  // The 3D build style draws its own scene (build3d.js).
-  if (window.Build3D) {
+  // The 3D build style draws its own scene (scene_*.js).
+  if (window.Scene3D) {
     var clock3 = { t: 0 };
-    window.Build3D.draw(0);
-    tl.to(clock3, { t: TOTAL, duration: TOTAL, ease: "none", onUpdate: function () { window.Build3D.draw(clock3.t); } }, 0);
+    window.Scene3D.draw(0);
+    tl.to(clock3, { t: TOTAL, duration: TOTAL, ease: "none", onUpdate: function () { window.Scene3D.draw(clock3.t); } }, 0);
   }
   tl.to(".progress-fill", { scaleX: 1, duration: TOTAL, ease: "none" }, 0);
 

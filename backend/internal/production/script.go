@@ -106,6 +106,12 @@ func (s *Service) GenerateScript(ctx context.Context, ch *channel.Channel, v *Vi
 		}
 		shape = f.Guide + "\nThe hook is one line that makes scrolling past impossible.\nThe outro is one short punchline line; at most add \"follow for more\"."
 	}
+	if v.VisualStyle == StyleBuild3D {
+		// The scene has fixed stages: one section each, told in order.
+		sc := sceneFor(v)
+		sections = len(sc.Stages)
+		shape += scenePrompt(sc)
+	}
 	var audience, identity string
 	if ch.Strategy != nil {
 		audience, identity = ch.Strategy.TargetAudience, ch.Strategy.EditorialIdentity

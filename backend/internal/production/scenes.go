@@ -348,7 +348,7 @@ type ProjectInput struct {
 	Background string
 	// FollowText is the closing call to action, in the channel's language.
 	FollowText string
-	// Build is the 3D build storyboard (3D build style only).
+	// Build is when each stage of the 3D scene starts (3D build style only).
 	Build *BuildData
 	// ThreeJS is three.js's CommonJS build (renderer/node_modules/three).
 	ThreeJS string
@@ -425,14 +425,14 @@ func WriteProject(dir string, in ProjectInput, gsapPath, fontsPkgDir string) err
 		if in.Build == nil || in.ThreeJS == "" {
 			return errors.New("3D build needs a storyboard and three.js (npm install in renderer/)")
 		}
-		if err := writeBuildAssets(filepath.Join(dir, "assets"), in.ThreeJS); err != nil {
+		if err := writeBuildAssets(filepath.Join(dir, "assets"), in.ThreeJS, in.Build.scene); err != nil {
 			return err
 		}
 		raw, err := json.Marshal(in.Build)
 		if err != nil {
 			return err
 		}
-		v.BuildJSON = template.JS(raw) // numbers and names from fixed lists only
+		v.BuildJSON = template.JS(raw) // numbers only
 	}
 	if storyStyle(in.Style) {
 		tmpl = storyTemplate
