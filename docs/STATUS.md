@@ -35,6 +35,7 @@ Last updated: 2026-11-10
 | Animated scenes (HyperFrames + GSAP) | Done | Styles: minimal, documentary, bold, tech, or auto from the niche; transitions, word-by-word captions, counters; falls back to a plain background |
 | Gameplay story style | Done | Original runner game drawn in code behind one-word centered captions; lo-fi bed |
 | Stock footage style | Done | Pexels videos with PEXELS_API_KEY (gap G11), else Wikimedia Commons photos with a slow pan; credits go into the description |
+| Two-voice scripts | Done | Per video: single narrator, Q&A, debate, or narrator and character; second Kokoro voice and caption color |
 | Word timing from the audio | Done | Parakeet TDT 110M via sherpa-onnx aligns captions to the narration |
 | Narration and soundtrack | Done | Kokoro v1.0 (fp32) voices; original music and effects synthesized in code; mastered to -14 LUFS |
 | YouTube publishing (resumable upload) | Blocked | Code and UI done; needs G3/G4. Private by default, marked as synthetic media |
@@ -118,7 +119,7 @@ Last updated: 2026-11-10
 
 | Date | Change |
 | --- | --- |
-| 2026-11-11 | Stock footage style (Pexels videos or Wikimedia Commons photos), one-button channel setup, activity center, captions timed from the audio, gameplay story style; partial content plans accepted (12+ ideas). |
+| 2026-11-11 | Stock footage style (Pexels videos or Wikimedia Commons photos), two-voice scripts, one-button channel setup, activity center, captions timed from the audio, gameplay story style; partial content plans accepted (12+ ideas). |
 | 2026-11-10 | Kokoro v1.0 voices replace the int8 v0.19 model (removes buzz); synthesized music and effects; animated captions and transitions. |
 | 2026-11-10 | Media tools installed (G9); production and publishing UI built (G10); HyperFrames animated scenes with four styles. |
 | 2026-11-10 | Production pipeline backend added; PRs #1 and #2 merged; work continues on master. |
