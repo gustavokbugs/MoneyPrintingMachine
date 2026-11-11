@@ -14,6 +14,8 @@ type fakeFootage struct {
 	results  map[string][]stock.Clip
 	err      error
 	searches []string
+	// limitAfter rate-limits every search after this many (0 = never).
+	limitAfter int
 }
 
 func (f *fakeFootage) Available() bool { return true }
@@ -21,6 +23,9 @@ func (f *fakeFootage) Search(_ context.Context, q, orientation string, _, _, _ i
 	f.searches = append(f.searches, orientation+":"+q)
 	if f.err != nil {
 		return nil, f.err
+	}
+	if f.limitAfter > 0 && len(f.searches) > f.limitAfter {
+		return nil, stock.ErrRateLimited
 	}
 	return f.results[q], nil
 }
@@ -211,5 +216,19 @@ func TestBroaden(t *testing.T) {
 	got := strings.Join(broaden([]string{"messy lab bench", "lab bench"}, "Science History"), "|")
 	if got != "messy lab bench|lab bench|science history" {
 		t.Errorf("broaden = %q", got)
+	}
+}
+
+// A rate limit midway keeps the clips already found for the video.
+func TestPlanFootageKeepsResultsAfterRateLimit(t *testing.T) {
+	f := &fakeFootage{results: map[string][]stock.Clip{"mold": {{ID: 1, Duration: 10}, {ID: 2, Duration: 10}}}, limitAfter: 1}
+	svc, _ := newTestService(t, &scriptedGen{}, nil, Tools{})
+	svc.WithFootage(f)
+	shots, err := svc.planFootage(context.Background(), []Timed{{Duration: 3}, {Duration: 3}}, [][]string{{"mold"}, {"war"}}, "", 1080, 1920, t.TempDir())
+	if err != nil || len(shots) != 2 {
+		t.Fatalf("shots=%d err=%v, want both segments covered", len(shots), err)
+	}
+	if len(f.searches) != 2 {
+		t.Errorf("searches = %v, want searching to stop at the first rate limit", f.searches)
 	}
 }

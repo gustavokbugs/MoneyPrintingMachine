@@ -166,13 +166,20 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 	// on free archives, so broaden them before giving up on a segment.
 	pools := make([][]stock.Clip, len(segs))
 	var all []stock.Clip
+	var limited error // set once a provider rate-limits; stop searching
 	for i, seg := range segs {
 		need := 2 * len(shotLengths(seg.Duration))
 		for _, q := range broaden(queries[i], niche) {
+			if limited != nil {
+				break
+			}
 			c, err := search(q)
 			if err != nil {
-				if errors.Is(err, stock.ErrNoKey) || errors.Is(err, stock.ErrRateLimited) {
+				if errors.Is(err, stock.ErrNoKey) {
 					return nil, err
+				}
+				if errors.Is(err, stock.ErrRateLimited) {
+					limited = err
 				}
 				continue // a failed query is skipped; others may work
 			}
@@ -182,6 +189,9 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 			}
 		}
 		all = append(all, pools[i]...)
+	}
+	if len(all) == 0 && limited != nil {
+		return nil, limited
 	}
 	if len(all) == 0 {
 		return nil, fmt.Errorf("no stock footage found for any segment (%s)", strings.Join(queries[0], "; "))
