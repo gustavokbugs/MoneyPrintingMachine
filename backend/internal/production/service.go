@@ -501,6 +501,10 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	}
 	captions := captionsFor(resolved, segs, width, height)
 	var build *BuildData
+	var stick *StickData
+	if resolved == StyleStick && s.tools.AnimatedScenes() {
+		stick = s.planStick(rctx, segs)
+	}
 	if resolved == StyleBuild3D && s.tools.AnimatedScenes() {
 		build = buildTiming(segs, sceneFor(v))
 	}
@@ -527,7 +531,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
 			ChannelName: ch.Name, Scenes: scenes, Captions: captions, Seed: seedOf(v.ID),
 			Pops: pops, HookText: hookText(segs), Background: background, FollowText: followText(ch.Language, ch.Name),
-			Build: build, ThreeJS: s.tools.ThreeJS,
+			Build: build, ThreeJS: s.tools.ThreeJS, Stick: stick,
 		})
 		if err != nil {
 			visual, note = "", "Animated scenes failed, so a plain background was used: "+truncateErr(err, 300)

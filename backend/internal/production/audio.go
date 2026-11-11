@@ -158,7 +158,7 @@ var moods = map[string]Mood{
 
 // MoodFor returns the music mood matching a resolved visual style.
 func MoodFor(style string) Mood {
-	if style == StyleBuild3D {
+	if style == StyleBuild3D || style == StyleStick {
 		style = StyleGameplay // the same laid-back bed
 	}
 	if m, ok := moods[style]; ok {

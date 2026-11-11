@@ -25,11 +25,12 @@ const (
 	StyleGameplay    = "gameplay"
 	StyleFootage     = "footage"
 	StyleBuild3D     = "build3d"
+	StyleStick       = "stick"
 )
 
 // storyStyle reports whether a style uses the one-word story layout (hook
 // card, centred captions, key-word colors, word sound effects).
-func storyStyle(s string) bool { return s == StyleGameplay || s == StyleBuild3D }
+func storyStyle(s string) bool { return s == StyleGameplay || s == StyleBuild3D || s == StyleStick }
 
 // Styles lists selectable styles with descriptions for the UI.
 var Styles = []struct {
@@ -44,6 +45,7 @@ var Styles = []struct {
 	{StyleTech, "Tech", "Monospace details over a moving grid. Good for science, space, and AI."},
 	{StyleFootage, "Stock footage", "Real clips matched to each part of the script, with one big word at a time: Pexels videos with a free API key, else free-licensed Wikimedia Commons photos."},
 	{StyleGameplay, "Gameplay story", "An original game-style run in the background with one big word at a time in the middle. Good for stories and quick facts."},
+	{StyleStick, "Stick explainer", "A hand-drawn stick figure explains with poses while a whiteboard draws an icon for each point. Good for explaining how things work."},
 	{StyleBuild3D, "3D build", "A low-poly 3D scene where each step of the story adds a piece, like watching something get built. Good for problem-fix chains and how-it-was-invented stories."},
 }
 
@@ -352,6 +354,8 @@ type ProjectInput struct {
 	Build *BuildData
 	// ThreeJS is three.js's CommonJS build (renderer/node_modules/three).
 	ThreeJS string
+	// Stick is the stick-figure storyboard (stick explainer style only).
+	Stick *StickData
 }
 
 type projectView struct {
@@ -366,6 +370,7 @@ type projectView struct {
 	PopData       []popData
 	HasBG         bool
 	BuildJSON     template.JS
+	StickJSON     template.JS
 }
 
 type popData struct {
@@ -433,6 +438,19 @@ func WriteProject(dir string, in ProjectInput, gsapPath, fontsPkgDir string) err
 			return err
 		}
 		v.BuildJSON = template.JS(raw) // numbers only
+	}
+	if in.Style == StyleStick {
+		if in.Stick == nil {
+			return errors.New("stick explainer needs a storyboard")
+		}
+		raw, err := json.Marshal(in.Stick)
+		if err != nil {
+			return err
+		}
+		v.StickJSON = template.JS(raw) // numbers and names from fixed lists; labels are JSON-escaped
+		if err := os.WriteFile(filepath.Join(dir, "assets", "scene.js"), sceneStickJS, 0o644); err != nil {
+			return fmt.Errorf("write stick scene: %w", err)
+		}
 	}
 	if storyStyle(in.Style) {
 		tmpl = storyTemplate

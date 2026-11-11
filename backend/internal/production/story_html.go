@@ -33,7 +33,7 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
 .hook .dot { width: calc(var(--u) * 6.5); height: calc(var(--u) * 6.5); border-radius: 50%; background: var(--accent); flex: none; }
 .hook .title { font-weight: 800; font-size: calc(var(--u) * 5.6); line-height: 1.12; letter-spacing: -0.01em; }
 .caps { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 4; pointer-events: none; }
-.cap { position: absolute; left: calc(var(--u) * 5); right: calc(var(--u) * 5); top: {{if .PopData}}60%{{else}}62%{{end}}; transform-origin: 50% 50%;
+.cap { position: absolute; left: calc(var(--u) * 5); right: calc(var(--u) * 5); top: {{if .StickJSON}}50%{{else if .PopData}}60%{{else}}62%{{end}}; transform-origin: 50% 50%;
   text-align: center; visibility: hidden; color: #FFFFFF; font-weight: 800; font-size: calc(var(--u) * 12.5); line-height: 1.05;
   letter-spacing: -0.015em; -webkit-text-stroke: calc(var(--u) * 1.5) #000000; paint-order: stroke fill;
   filter: drop-shadow(0 calc(var(--u) * 0.8) calc(var(--u) * 0.6) rgba(0,0,0,0.55)); }
@@ -54,7 +54,9 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
 </head>
 <body>
 <div id="root" data-composition-id="main" data-start="0" data-duration="{{sec .Total}}" data-width="{{.Width}}" data-height="{{.Height}}">
-{{if .BuildJSON}}  <canvas id="gl3d" class="clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="0" width="{{.Width}}" height="{{.Height}}"
+{{if .StickJSON}}  <svg id="stick" class="clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="0" viewBox="0 0 {{.Width}} {{.Height}}" width="{{.Width}}" height="{{.Height}}"
+    style="position:absolute;inset:0"></svg>
+{{else if .BuildJSON}}  <canvas id="gl3d" class="clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="0" width="{{.Width}}" height="{{.Height}}"
     style="position:absolute;inset:0;width:100%;height:100%"></canvas>
 {{else if .HasBG}}  <video id="bgv" class="clip" src="assets/bg.mp4" muted playsinline data-start="0" data-duration="{{sec .Total}}" data-track-index="0"
     style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>
@@ -62,7 +64,7 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
     <canvas id="game" width="{{.Width}}" height="{{.Height}}"></canvas>
   </div>
 {{end}}
-{{if .Scenes}}{{with index .Scenes 0}}  <div class="hook clip" id="hook" data-start="0" data-duration="{{sec .Duration}}" data-track-index="1">
+{{if and .Scenes (not .StickJSON)}}{{with index .Scenes 0}}  <div class="hook clip" id="hook" data-start="0" data-duration="{{sec .Duration}}" data-track-index="1">
     <div class="who"><span class="dot"></span><span>{{$.ChannelName}}</span></div>
     <div class="title">{{if $.HookText}}{{$.HookText}}{{else}}{{.Headline}}{{end}}</div>
   </div>
@@ -77,7 +79,9 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
     <div class="progress"><div class="progress-fill"></div></div>
   </div>
 </div>
-{{if .BuildJSON}}<script>window.BUILD = {{.BuildJSON}};</script>
+{{if .StickJSON}}<script>window.STICK = {{.StickJSON}};</script>
+<script src="assets/scene.js"></script>
+{{end}}{{if .BuildJSON}}<script>window.BUILD = {{.BuildJSON}};</script>
 <script src="assets/three.js"></script>
 <script src="assets/scene.js"></script>
 {{end}}<script>
@@ -269,6 +273,8 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
     draw(0);
     tl.to(clock, { t: TOTAL, duration: TOTAL, ease: "none", onUpdate: function () { draw(clock.t); } }, 0);
   }
+  // The stick explainer adds its poses and drawings to this timeline.
+  if (window.Scene2D) window.Scene2D.build(tl);
   // The 3D build style draws its own scene (scene_*.js).
   if (window.Scene3D) {
     var clock3 = { t: 0 };
