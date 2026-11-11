@@ -35,7 +35,7 @@ var Scenes3D = []Scene3D{{
 		"Fix: clay is packed into the gaps and the leaks stop.",
 		"A lake grows behind the wall.",
 		"Problem: the lake gets too full and water pours over the top.",
-		"The overflow washes the wall away and the lake drains.",
+		"Problem: the overflow washes the wall away and the lake drains.",
 		"Fix: a thick stone dam, wider at the bottom, is built layer by layer, and the lake refills.",
 		"Fix: a spillway channel at the side carries the extra water safely down.",
 		"The falling water spins a water wheel.",
@@ -109,4 +109,27 @@ func writeBuildAssets(assetsDir, threeCJS string, sc Scene3D) error {
 		return fmt.Errorf("write three.js: %w", err)
 	}
 	return os.WriteFile(filepath.Join(assetsDir, "scene.js"), sc.js, 0o644)
+}
+
+// stageMarks keeps the caption colors in step with the scene: red only on
+// "Problem:" stages, yellow only on "Fix:" stages, nothing elsewhere.
+// plans line up with segments: the hook, one per stage, then the outro.
+func stageMarks(plans []popPlan, sc Scene3D) []popPlan {
+	out := make([]popPlan, len(plans))
+	for i, p := range plans {
+		out[i] = popPlan{Query: p.Query}
+		if i < 1 || i > len(sc.Stages) {
+			continue
+		}
+		switch stage := sc.Stages[i-1]; {
+		case strings.HasPrefix(stage, "Problem:"):
+			out[i].Problem = p.Problem
+			if out[i].Problem == "" {
+				out[i].Problem = p.Keyword
+			}
+		case strings.HasPrefix(stage, "Fix:"):
+			out[i].Keyword = p.Keyword
+		}
+	}
+	return out
 }

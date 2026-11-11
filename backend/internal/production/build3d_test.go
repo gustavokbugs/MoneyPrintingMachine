@@ -92,3 +92,25 @@ func TestWriteProjectBuild3D(t *testing.T) {
 		t.Error("a 3D build without three.js must fail clearly")
 	}
 }
+
+func TestStageMarksFollowTheScene(t *testing.T) {
+	sc := Scenes3D[0]
+	plans := make([]popPlan, len(sc.Stages)+2)
+	for i := range plans {
+		plans[i] = popPlan{Keyword: "fix", Problem: "oops", Query: "q"}
+	}
+	plans[2].Problem = "" // the model found no problem word on a problem stage
+	got := stageMarks(plans, sc)
+	if got[0].Keyword != "" || got[len(got)-1].Problem != "" {
+		t.Error("the hook and outro get no colors")
+	}
+	if got[1].Keyword != "" || got[1].Problem != "" {
+		t.Errorf("stage 1 (stones) is neither problem nor fix: %+v", got[1])
+	}
+	if got[2].Problem != "fix" || got[2].Keyword != "" {
+		t.Errorf("stage 2 is a problem; fall back to the key word: %+v", got[2])
+	}
+	if got[3].Keyword != "fix" || got[3].Problem != "" {
+		t.Errorf("stage 3 is a fix: %+v", got[3])
+	}
+}
