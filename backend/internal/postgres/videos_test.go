@@ -38,11 +38,11 @@ func TestVideoRepository(t *testing.T) {
 	if got.StoryFormat != production.FormatExplainer {
 		t.Errorf("default story format = %q", got.StoryFormat)
 	}
-	got.StoryFormat, got.TargetSeconds = production.FormatEscalation, production.ShortFormatSeconds
+	got.StoryFormat, got.TargetSeconds, got.AspectRatio = production.FormatEscalation, production.ShortFormatSeconds, "16:9"
 	if err := r.Save(ctx, got); err != nil {
 		t.Fatal(err)
 	}
-	if again, err := r.Get(ctx, "alice", v.ID); err != nil || again.StoryFormat != production.FormatEscalation || again.TargetSeconds != production.ShortFormatSeconds {
+	if again, err := r.Get(ctx, "alice", v.ID); err != nil || again.StoryFormat != production.FormatEscalation || again.TargetSeconds != production.ShortFormatSeconds || again.AspectRatio != "16:9" {
 		t.Fatalf("story format round trip: %+v %v", again, err)
 	}
 

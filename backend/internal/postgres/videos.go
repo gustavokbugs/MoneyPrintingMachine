@@ -112,10 +112,10 @@ func (r *VideoRepository) Save(ctx context.Context, v *production.Video) error {
 		}
 	}
 	tag, err := r.pool.Exec(ctx, `UPDATE videos SET status = $1, status_reason = $2, voice_id = $3, script = $4, output = $5, visual_style = $9,
-			dialogue_mode = $10, voice_b = $11, story_format = $12, target_seconds = $13, version = version + 1, updated_at = now()
+			dialogue_mode = $10, voice_b = $11, story_format = $12, target_seconds = $13, aspect_ratio = $14, version = version + 1, updated_at = now()
 		WHERE id = $6 AND owner_id = $7 AND version = $8`,
 		string(v.Status), v.StatusReason, v.VoiceID, script, output, v.ID, v.OwnerID, v.Version, styleOrAuto(v.VisualStyle), dialogueOrNarration(v.DialogueMode), voiceBOrDefault(v.VoiceB),
-		formatOrExplainer(v.StoryFormat), v.TargetSeconds)
+		formatOrExplainer(v.StoryFormat), v.TargetSeconds, v.AspectRatio)
 	if err != nil {
 		return fmt.Errorf("update video: %w", err)
 	}

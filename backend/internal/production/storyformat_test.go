@@ -23,7 +23,7 @@ func TestSetStoryFormat(t *testing.T) {
 		t.Errorf("unknown format: %v", err)
 	}
 	got, err := svc.SetStoryFormat(context.Background(), "alice", v.ID, FormatEscalation)
-	if err != nil || got.StoryFormat != FormatEscalation || got.TargetSeconds != ShortFormatSeconds {
+	if err != nil || got.StoryFormat != FormatEscalation || got.TargetSeconds != ShortFormatSeconds || got.AspectRatio != "9:16" {
 		t.Fatalf("set: %+v %v", got, err)
 	}
 	// Explainer keeps the current length.

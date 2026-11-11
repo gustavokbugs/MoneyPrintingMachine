@@ -55,7 +55,8 @@ func storyFormat(id string) (StoryFormat, bool) {
 }
 
 // SetStoryFormat chooses how the next script is told. Short formats also
-// reset the target length, which sizes the script.
+// reset the target length, which sizes the script, and make the video
+// vertical, since they are made for Shorts, Reels, and TikTok.
 func (s *Service) SetStoryFormat(ctx context.Context, ownerID, id, format string) (*Video, error) {
 	f, ok := storyFormat(format)
 	if !ok {
@@ -68,6 +69,7 @@ func (s *Service) SetStoryFormat(ctx context.Context, ownerID, id, format string
 		v.StoryFormat = f.ID
 		if f.Seconds > 0 {
 			v.TargetSeconds = f.Seconds
+			v.AspectRatio = "9:16"
 		}
 		return nil
 	})
