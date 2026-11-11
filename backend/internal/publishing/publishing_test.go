@@ -11,6 +11,7 @@ import (
 	"contentfactory/internal/connections"
 	"contentfactory/internal/jobs"
 	"contentfactory/internal/production"
+	"contentfactory/internal/stock"
 	"contentfactory/internal/youtube"
 )
 
@@ -151,5 +152,20 @@ func TestCheckRequirements(t *testing.T) {
 	}
 	if _, err := svc.Check(context.Background(), "bob", "v1", "private"); !errors.Is(err, production.ErrNotFound) {
 		t.Fatalf("other owner: %v", err)
+	}
+}
+
+func TestDescriptionCreditsStockFootage(t *testing.T) {
+	v := &production.Video{Output: &production.Output{SyntheticVoice: true, Footage: []stock.Clip{
+		{ID: 1, Author: "Ana", PageURL: "https://www.pexels.com/video/1/"},
+	}}}
+	d := Description(&channel.Channel{}, v)
+	for _, want := range []string{"Stock footage from Pexels", "- Ana https://www.pexels.com/video/1/", "synthetic (AI-generated) voice"} {
+		if !strings.Contains(d, want) {
+			t.Errorf("description missing %q:\n%s", want, d)
+		}
+	}
+	if strings.Contains(Description(&channel.Channel{}, &production.Video{Output: &production.Output{}}), "Pexels") {
+		t.Error("credits shown without footage")
 	}
 }

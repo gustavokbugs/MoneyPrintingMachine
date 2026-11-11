@@ -143,7 +143,7 @@ func (s *Service) List(ctx context.Context, ownerID, videoID string) ([]Publicat
 }
 
 // Description builds the video description: channel bio, the hook, the
-// sources to check, and an AI-voice disclosure.
+// sources to check, stock footage credits, and an AI-voice disclosure.
 func Description(ch *channel.Channel, v *production.Video) string {
 	var parts []string
 	if v.Script != nil && v.Script.Hook != "" {
@@ -164,6 +164,14 @@ func Description(ch *channel.Channel, v *production.Video) string {
 		if len(sources) > 0 {
 			parts = append(parts, "Sources:\n"+strings.Join(sources, "\n"))
 		}
+	}
+	if v.Output != nil && len(v.Output.Footage) > 0 {
+		// Pexels asks for credit to the platform and its creators.
+		credits := []string{"Stock footage from Pexels (https://www.pexels.com):"}
+		for _, c := range v.Output.Footage {
+			credits = append(credits, "- "+c.Author+" "+c.PageURL)
+		}
+		parts = append(parts, strings.Join(credits, "\n"))
 	}
 	if v.Output != nil && v.Output.SyntheticVoice {
 		parts = append(parts, "Narration uses a synthetic (AI-generated) voice.")
