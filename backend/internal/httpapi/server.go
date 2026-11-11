@@ -23,6 +23,11 @@ type JobQueue interface {
 	Get(ctx context.Context, ownerID, id string) (jobs.Job, error)
 }
 
+// JobHistory lists recent jobs for the activity center.
+type JobHistory interface {
+	ListRecent(ctx context.Context, ownerID string, since time.Time, limit int, exclude []string) ([]jobs.Job, error)
+}
+
 // SavedNiches stores bookmarked niche ideas.
 type SavedNiches interface {
 	Create(ctx context.Context, ownerID, name, notes string, data json.RawMessage) (launchpad.SavedNiche, error)
@@ -44,11 +49,15 @@ type HealthCheck struct {
 
 // Deps holds handler dependencies.
 type Deps struct {
-	Channels    *channel.Service
-	Jobs        JobQueue
-	SavedNiches SavedNiches
-	Connections Connections
-	Health      []HealthCheck
+	Channels *channel.Service
+	Jobs     JobQueue
+	// JobHistory enables GET /api/jobs (nil disables it).
+	JobHistory JobHistory
+	// HiddenJobKinds are left out of the activity list (housekeeping).
+	HiddenJobKinds []string
+	SavedNiches    SavedNiches
+	Connections    Connections
+	Health         []HealthCheck
 	// Optional integrations; nil when not configured.
 	YouTube YouTubeConnections
 	Trends  TrendService
@@ -145,6 +154,9 @@ func NewHandler(d Deps) http.Handler {
 
 	mux.HandleFunc("GET /api/platforms", s.listPlatforms)
 	mux.HandleFunc("GET /api/jobs/{id}", s.getJob)
+	if d.JobHistory != nil {
+		mux.HandleFunc("GET /api/jobs", s.listJobs)
+	}
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "Endpoint not found.")

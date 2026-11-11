@@ -402,6 +402,37 @@ func (s *server) listPlatforms(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": platforms.Catalog(s.YouTube != nil && s.YouTube.Configured())})
 }
 
+// listJobs returns recent jobs (default: the last 24 hours, at most 50)
+// so the UI can show background work and notify when it finishes.
+func (s *server) listJobs(w http.ResponseWriter, r *http.Request) {
+	since := time.Now().Add(-24 * time.Hour)
+	if v := r.URL.Query().Get("since"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			writeFieldError(w, http.StatusBadRequest, "invalid_query", "since must be an RFC 3339 time.", "since")
+			return
+		}
+		if t.After(since) {
+			since = t
+		}
+	}
+	limit := 50
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 100 {
+			writeFieldError(w, http.StatusBadRequest, "invalid_query", "limit must be between 1 and 100.", "limit")
+			return
+		}
+		limit = n
+	}
+	items, err := s.JobHistory.ListRecent(r.Context(), s.OwnerID, since, limit, s.HiddenJobKinds)
+	if err != nil {
+		s.writeDomainError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
 func (s *server) getJob(w http.ResponseWriter, r *http.Request) {
 	j, err := s.Jobs.Get(r.Context(), s.OwnerID, r.PathValue("id"))
 	if err != nil {

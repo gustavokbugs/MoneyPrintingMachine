@@ -237,3 +237,29 @@ func TestSavedNiches(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestJobStoreListRecent(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	store := NewJobStore(pool)
+	enq := jobs.NewEnqueuer(store)
+	for _, nj := range []jobs.NewJob{
+		{OwnerID: "alice", Kind: "launchpad.autopilot"},
+		{OwnerID: "alice", Kind: "trends.refresh"},
+		{OwnerID: "bob", Kind: "production.produce"},
+	} {
+		if _, err := enq.Enqueue(ctx, nj); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := store.ListRecent(ctx, "alice", time.Now().Add(-time.Hour), 10, []string{"trends.refresh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Kind != "launchpad.autopilot" {
+		t.Fatalf("got %+v, want only alice's visible job", got)
+	}
+	if none, err := store.ListRecent(ctx, "alice", time.Now().Add(time.Hour), 10, nil); err != nil || len(none) != 0 {
+		t.Fatalf("future since: %+v %v", none, err)
+	}
+}

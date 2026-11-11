@@ -125,10 +125,13 @@ func run(log *slog.Logger) error {
 	go refresh.Schedule(ctx, jobs.NewEnqueuer(jobStore), cfg.LocalOwnerID, 15*time.Minute, log.With("component", "scheduler"))
 
 	api := httpapi.NewHandler(httpapi.Deps{
-		Channels:    channels,
-		Jobs:        jobs.NewEnqueuer(jobStore),
-		SavedNiches: postgres.NewSavedNicheRepository(pool),
-		Connections: connections,
+		Channels:   channels,
+		Jobs:       jobs.NewEnqueuer(jobStore),
+		JobHistory: jobStore,
+		// Scheduled trend refreshes are housekeeping, not user requests.
+		HiddenJobKinds: []string{refresh.KindTrendRefresh},
+		SavedNiches:    postgres.NewSavedNicheRepository(pool),
+		Connections:    connections,
 		Health: []httpapi.HealthCheck{
 			{Name: "database", Check: func(ctx context.Context) error { return pool.Ping(ctx) }},
 			{Name: "local_model", Check: model.Ping},

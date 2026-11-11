@@ -74,6 +74,31 @@ func (s *JobStore) Get(ctx context.Context, ownerID, id string) (jobs.Job, error
 	return j, nil
 }
 
+// ListRecent returns the owner's jobs updated since the given time, newest
+// first, at most limit, leaving out the excluded kinds (background
+// housekeeping the user did not ask for).
+func (s *JobStore) ListRecent(ctx context.Context, ownerID string, since time.Time, limit int, exclude []string) ([]jobs.Job, error) {
+	if exclude == nil {
+		exclude = []string{}
+	}
+	rows, err := s.pool.Query(ctx, `SELECT `+jobColumns+` FROM jobs
+		WHERE owner_id = $1 AND updated_at >= $2 AND NOT (kind = ANY($3))
+		ORDER BY updated_at DESC LIMIT $4`, ownerID, since, exclude, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list jobs: %w", err)
+	}
+	defer rows.Close()
+	out := []jobs.Job{}
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan job: %w", err)
+		}
+		out = append(out, j)
+	}
+	return out, rows.Err()
+}
+
 // Claim leases the oldest runnable job. Jobs whose lease expired (for
 // example after a crash) become claimable again.
 func (s *JobStore) Claim(ctx context.Context, kinds []string, lease time.Duration) (*jobs.Job, error) {
