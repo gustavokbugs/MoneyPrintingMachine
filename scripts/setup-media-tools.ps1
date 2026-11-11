@@ -8,6 +8,7 @@
   - sherpa-onnx v2.0.1 (Apache-2.0) offline text-to-speech tools, pinned SHA-256.
   - Kokoro v1.0 full-precision voice model (Apache-2.0) with its English
     lexicons, pinned SHA-256.
+  - Parakeet TDT 110M word-timing model (CC-BY-4.0, NVIDIA), pinned SHA-256.
   - Inter 4.1 font (SIL OFL 1.1), pinned SHA-256 of the first verified download.
 #>
 $ErrorActionPreference = 'Stop'
@@ -96,6 +97,19 @@ if (-not (Test-Path $lexicon)) {
   $lex = Get-Verified 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/lexicon-en-us.txt' 'lexicon-en-us.txt' `
     '8b67ae549a465eee78f92ecb74644ad90c3c58ce65f19c68baf85878a10ef73a'
   Copy-Item $lex $lexicon -Force
+}
+
+# --- Word timing model ------------------------------------------------------
+# NVIDIA Parakeet TDT 110M (CC-BY-4.0) converted for sherpa-onnx: transcribes
+# the narration back so captions follow the voice word by word.
+$asrDir = Join-Path $local 'models\sherpa-onnx-nemo-parakeet_tdt_transducer_110m-en-36000-int8'
+if (-not (Test-Path (Join-Path $asrDir 'encoder.int8.onnx'))) {
+  $name = 'sherpa-onnx-nemo-parakeet_tdt_transducer_110m-en-36000-int8.tar.bz2'
+  $arc = Get-Verified "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$name" $name `
+    'f628312e9fdf8686374cb01a69425c41732529d540860311f16f37cbc32cfe9b'
+  $models = Join-Path $local 'models'
+  New-Item -ItemType Directory -Force $models | Out-Null
+  & $tar -xjf $arc -C $models
 }
 
 # --- Inter font -----------------------------------------------------------

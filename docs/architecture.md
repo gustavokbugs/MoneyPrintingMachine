@@ -52,6 +52,7 @@ Dependencies point inward: `channel` knows nothing about HTTP, SQL, or models; a
 | FFmpeg 8.1 (BtbN GPL build) | GPL-3.0; used as a separate program, not linked |
 | sherpa-onnx v2.0.1 | Apache 2.0 |
 | Kokoro 82M v1.0 voice model (fp32, sherpa-onnx export) | Apache 2.0 (verify on the model card) |
+| Parakeet TDT 110M word-timing model (NVIDIA, sherpa-onnx int8 export) | CC-BY-4.0 (credit NVIDIA; used only to time captions, nothing is redistributed) |
 | Music and sound effects | Generated in code (`internal/production/audio.go`); original, no third-party audio |
 | HyperFrames 0.8.209 | Apache 2.0; telemetry disabled through environment variables |
 | GSAP 3.15.0 | GSAP Standard No-Charge License (free, including commercial use; may not be used in a tool that competes with Webflow) |
