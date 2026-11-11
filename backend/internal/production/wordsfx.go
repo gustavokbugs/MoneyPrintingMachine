@@ -62,17 +62,23 @@ func soundFor(word string) string {
 }
 
 // Spacing keeps word effects from crowding the narration: any two are at
-// least minEffectGap apart, and the same sound repeats only after
-// sameEffectGap.
+// least minEffectGap apart, the same sound repeats only after
+// sameEffectGap, and there is at most one per effectEvery seconds.
 const (
-	minEffectGap  = 1.2
-	sameEffectGap = 4.0
+	minEffectGap  = 3.0
+	sameEffectGap = 12.0
+	effectEvery   = 6.0
 )
 
 // PlanWordEffects places an effect on each word that names a sound, at the
 // moment it is spoken (measured word times when available).
 func PlanWordEffects(segs []Timed) []SFXCue {
 	var cues []SFXCue
+	total := 0.0
+	for _, seg := range segs {
+		total += seg.Duration
+	}
+	limit := max(1, int(total/effectEvery))
 	last := map[string]float64{}
 	prev := -10.0
 	offset := 0.0
@@ -92,6 +98,9 @@ func PlanWordEffects(segs []Timed) []SFXCue {
 			}
 			if t, ok := last[kind]; ok && at-t < sameEffectGap {
 				continue
+			}
+			if len(cues) >= limit {
+				return cues
 			}
 			cues = append(cues, SFXCue{At: at, Kind: kind, Word: normWord(w)})
 			last[kind], prev = at, at
@@ -125,29 +134,29 @@ func sfxQuery(c SFXCue) string {
 func renderWordEffect(t *Track, r *rng, c SFXCue) bool {
 	switch c.Kind {
 	case SFXHiss:
-		hiss(t, r, c.At, 1.3, 0.8)
+		hiss(t, r, c.At, 1.1, 0.42)
 	case SFXFire:
-		crackle(t, r, c.At, 1.6, 0.8)
+		crackle(t, r, c.At, 1.4, 0.42)
 	case SFXSplash:
-		splash(t, r, c.At, 0.9)
+		splash(t, r, c.At, 0.5)
 	case SFXKnock:
 		for k := 0; k < 3; k++ {
-			knock(t, r, c.At+float64(k)*0.17, 0.9)
+			knock(t, r, c.At+float64(k)*0.17, 0.5)
 		}
 	case SFXZap:
-		zap(t, r, c.At, 0.6, 0.45)
+		zap(t, r, c.At, 0.5, 0.25)
 	case SFXShatter:
-		shatter(t, r, c.At, 0.8)
+		shatter(t, r, c.At, 0.45)
 	case SFXHeartbeat:
 		for k := 0; k < 2; k++ {
 			knockAt(t, c.At+float64(k)*0.8, 55, 0.12, 0.8)
 			knockAt(t, c.At+float64(k)*0.8+0.16, 50, 0.1, 0.6)
 		}
 	case SFXWind:
-		wind(t, r, c.At, 2.2, 0.8)
+		wind(t, r, c.At, 1.8, 0.42)
 	case SFXCrunch:
 		for k := 0; k < 7; k++ {
-			hiss(t, r, c.At+float64(k)*0.035+r.float()*0.02, 0.03, 0.8)
+			hiss(t, r, c.At+float64(k)*0.035+r.float()*0.02, 0.03, 0.42)
 		}
 	case SFXClock:
 		for k := 0; k < 4; k++ {
@@ -155,12 +164,12 @@ func renderWordEffect(t *Track, r *rng, c SFXCue) bool {
 			if k%2 == 1 {
 				f = 1600
 			}
-			blip(t, c.At+float64(k)*0.5, f, 0.015, 0.45)
+			blip(t, c.At+float64(k)*0.5, f, 0.015, 0.25)
 		}
 	case SFXPop:
 		// A burst, like popcorn: quick pops at random moments.
-		for k := 0; k < 9; k++ {
-			pop(t, c.At+r.float()*1.1, 0.5+r.float()*0.4)
+		for k := 0; k < 6; k++ {
+			pop(t, c.At+r.float()*0.9, 0.25+r.float()*0.2)
 		}
 	default:
 		return false
