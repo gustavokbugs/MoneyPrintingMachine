@@ -6,7 +6,8 @@
   - FFmpeg 8.1 GPL build (BtbN/FFmpeg-Builds), verified against the
     release's checksums.sha256 (the build is refreshed daily upstream).
   - sherpa-onnx v2.0.1 (Apache-2.0) offline text-to-speech tools, pinned SHA-256.
-  - Kokoro int8 English v0.19 voice model (Apache-2.0), pinned SHA-256.
+  - Kokoro int8 English v0.19 voice model (Apache-2.0) and the English
+    lexicon sherpa-onnx v2 needs, pinned SHA-256.
   - Inter 4.1 font (SIL OFL 1.1), pinned SHA-256 of the first verified download.
 #>
 $ErrorActionPreference = 'Stop'
@@ -81,6 +82,14 @@ if (-not (Test-Path (Join-Path $modelDir 'voices.bin'))) {
   $models = Join-Path $local 'models'
   New-Item -ItemType Directory -Force $models | Out-Null
   tar -xjf $arc -C $models
+}
+
+# --- English lexicon (sherpa-onnx v2 no longer bundles espeak-ng) ---
+$lexicon = Join-Path $modelDir 'lexicon-en-us.txt'
+if (-not (Test-Path $lexicon)) {
+  $lex = Get-Verified 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/lexicon-en-us.txt' 'lexicon-en-us.txt' `
+    '8b67ae549a465eee78f92ecb74644ad90c3c58ce65f19c68baf85878a10ef73a'
+  Copy-Item $lex $lexicon -Force
 }
 
 # --- Inter font -----------------------------------------------------------

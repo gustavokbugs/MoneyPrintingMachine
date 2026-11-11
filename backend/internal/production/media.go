@@ -45,7 +45,7 @@ func ToolsFromRoot(root string) Tools {
 // Missing lists tools that are not present on disk.
 func (t Tools) Missing() []string {
 	var out []string
-	for name, p := range map[string]string{"ffmpeg": t.FFmpeg, "ffprobe": t.FFprobe, "tts": t.TTS, "voice model": filepath.Join(t.ModelDir, "voices.bin"), "fonts": filepath.Join(t.FontsDir, "Inter-Bold.ttf")} {
+	for name, p := range map[string]string{"ffmpeg": t.FFmpeg, "ffprobe": t.FFprobe, "tts": t.TTS, "voice model": filepath.Join(t.ModelDir, "voices.bin"), "lexicon": filepath.Join(t.ModelDir, "lexicon-en-us.txt"), "fonts": filepath.Join(t.FontsDir, "Inter-Bold.ttf")} {
 		if _, err := os.Stat(p); err != nil {
 			out = append(out, name)
 		}
@@ -145,7 +145,7 @@ func TTSArgs(tools Tools, model string, voice int, text, out string) []string {
 		"--kokoro-model=" + filepath.Join(tools.ModelDir, model),
 		"--kokoro-voices=" + filepath.Join(tools.ModelDir, "voices.bin"),
 		"--kokoro-tokens=" + filepath.Join(tools.ModelDir, "tokens.txt"),
-		"--kokoro-data-dir=" + filepath.Join(tools.ModelDir, "espeak-ng-data"),
+		"--kokoro-lexicon=" + filepath.Join(tools.ModelDir, "lexicon-en-us.txt"),
 		"--num-threads=4",
 		"--sid=" + strconv.Itoa(voice),
 		"--output-filename=" + out,

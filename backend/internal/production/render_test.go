@@ -122,7 +122,7 @@ func contains(xs []string, s string) bool {
 }
 
 func TestToolsMissing(t *testing.T) {
-	if len(ToolsFromRoot(t.TempDir()).Missing()) != 5 {
+	if len(ToolsFromRoot(t.TempDir()).Missing()) != 6 {
 		t.Fatal("all tools should be missing in an empty directory")
 	}
 }
