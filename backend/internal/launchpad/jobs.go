@@ -28,6 +28,7 @@ type ChannelStore interface {
 	SetStrategy(ctx context.Context, ownerID, id string, s channel.Strategy) (*channel.Channel, error)
 	SetIdentity(ctx context.Context, ownerID, id string, i channel.Identity) (*channel.Channel, error)
 	SetBlueprint(ctx context.Context, ownerID, id string, b channel.Blueprint) (*channel.Channel, error)
+	UpdateSettings(ctx context.Context, ownerID, id string, u channel.SettingsUpdate) (*channel.Channel, error)
 }
 
 // ChannelJobResult is returned by channel generation jobs.
@@ -63,6 +64,16 @@ func (e *Engine) Handlers(store ChannelStore) map[string]jobs.Handler {
 			_, err = store.SetIdentity(ctx, ch.OwnerID, ch.ID, *idn)
 			return err
 		}),
+		KindAutopilot: func(ctx context.Context, j jobs.Job) (any, error) {
+			if j.ChannelID == "" {
+				return nil, jobs.Permanent(errors.New("job has no channel"))
+			}
+			res, err := e.Autopilot(ctx, store, j.OwnerID, j.ChannelID)
+			if err != nil {
+				return nil, classify(err)
+			}
+			return res, nil
+		},
 		KindGenerateBlueprint: e.channelHandler(store, func(ctx context.Context, ch *channel.Channel) error {
 			bp, err := e.GenerateBlueprint(ctx, ch)
 			if err != nil {

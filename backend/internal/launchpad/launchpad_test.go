@@ -460,3 +460,12 @@ func TestClassify(t *testing.T) {
 		t.Error("precondition errors should be permanent")
 	}
 }
+func (f *fakeStore) UpdateSettings(_ context.Context, _, _ string, u channel.SettingsUpdate) (*channel.Channel, error) {
+	if u.Name != nil {
+		f.ch.Name = *u.Name
+	}
+	if u.Niche != nil {
+		f.ch.Niche = *u.Niche
+	}
+	return f.ch, nil
+}

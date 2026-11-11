@@ -259,6 +259,8 @@ func (s *server) generate(kind string) http.HandlerFunc {
 			return
 		}
 		switch {
+		case kind == launchpad.KindAutopilot:
+			// Autopilot fills whatever is missing, including the niche.
 		case kind == launchpad.KindGenerateStrategy && c.Niche == "":
 			writeError(w, http.StatusConflict, "precondition_failed", "Select a niche before generating a strategy.")
 			return

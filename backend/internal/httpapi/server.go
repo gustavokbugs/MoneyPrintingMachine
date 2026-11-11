@@ -93,6 +93,7 @@ func NewHandler(d Deps) http.Handler {
 	mux.HandleFunc("POST /api/channels/{id}/strategy/generate", s.generate(launchpad.KindGenerateStrategy))
 	mux.HandleFunc("POST /api/channels/{id}/identity/generate", s.generate(launchpad.KindGenerateIdentity))
 	mux.HandleFunc("POST /api/channels/{id}/blueprint/generate", s.generate(launchpad.KindGenerateBlueprint))
+	mux.HandleFunc("POST /api/channels/{id}/autopilot", s.generate(launchpad.KindAutopilot))
 	mux.HandleFunc("GET /api/channels/{id}/assets/{asset}", s.asset)
 	mux.HandleFunc("GET /api/channels/{id}/connections", s.listConnections)
 	mux.HandleFunc("GET /api/channels/{id}/launch-review", s.launchReview)
