@@ -443,7 +443,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 			visual, credits, note = "", nil, "Stock footage was not available, so animated scenes were used: "+truncateErr(err, 300)
 			resolved = StyleMinimal
 		} else {
-			visuals = "footage:pexels"
+			visuals = FootageLabel(credits)
 		}
 	}
 	if resolved != StyleFootage && s.tools.AnimatedScenes() {

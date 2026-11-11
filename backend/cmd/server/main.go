@@ -101,7 +101,7 @@ func run(log *slog.Logger) error {
 	configureRendererEnv(localDir)
 	videos := production.NewService(postgres.NewVideoRepository(pool), channels, model,
 		production.ToolsFromRoot(localDir).WithRenderer(filepath.Join("..", "renderer")), production.ExecRunner{}, filepath.Join(localDir, "media")).
-		WithFootage(stock.NewClient(cfg.PexelsAPIKey, 2*time.Minute))
+		WithFootage(stock.Sources{Pexels: stock.NewClient(cfg.PexelsAPIKey, 2*time.Minute), Commons: stock.NewCommons(2 * time.Minute)})
 	for k, h := range videos.Handlers() {
 		handlers[k] = h
 	}

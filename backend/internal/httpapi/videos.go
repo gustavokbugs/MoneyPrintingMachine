@@ -20,7 +20,7 @@ type Videos interface {
 	SetVoice(ctx context.Context, ownerID, id string, voice int) (*production.Video, error)
 	SetStyle(ctx context.Context, ownerID, id, style string) (*production.Video, error)
 	AnimatedScenes() bool
-	FootageAvailable() bool
+	StockVideoAvailable() bool
 	CheckCanScript(ctx context.Context, ownerID, id string) (*production.Video, error)
 	CheckCanProduce(ctx context.Context, ownerID, id string) (*production.Video, error)
 	MediaPath(ctx context.Context, ownerID, id, name string) (string, error)
@@ -33,7 +33,7 @@ func (s *server) productionStatus(w http.ResponseWriter, _ *http.Request) {
 		missing = []string{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ready": len(missing) == 0, "missing": missing, "voices": production.Voices,
-		"styles": production.Styles, "animatedScenes": s.Videos.AnimatedScenes(), "stockFootage": s.Videos.FootageAvailable()})
+		"styles": production.Styles, "animatedScenes": s.Videos.AnimatedScenes(), "stockFootage": s.Videos.StockVideoAvailable()})
 }
 
 func (s *server) listVideos(w http.ResponseWriter, r *http.Request) {

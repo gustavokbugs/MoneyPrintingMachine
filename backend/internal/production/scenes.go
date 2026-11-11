@@ -35,7 +35,7 @@ var Styles = []struct {
 	{StyleDocumentary, "Documentary", "Serif titles, film grain, and slow camera drift. Good for history and true stories."},
 	{StyleBold, "Bold", "Huge type, strong color bands, and big counters. Good for finance and business."},
 	{StyleTech, "Tech", "Monospace details over a moving grid. Good for science, space, and AI."},
-	{StyleFootage, "Stock footage", "Real video clips from Pexels matched to each part of the script, with one big word at a time. Needs a free Pexels API key."},
+	{StyleFootage, "Stock footage", "Real clips matched to each part of the script, with one big word at a time: Pexels videos with a free API key, else free-licensed Wikimedia Commons photos."},
 	{StyleGameplay, "Gameplay story", "An original game-style run in the background with one big word at a time in the middle. Good for stories and quick facts."},
 }
 

@@ -120,11 +120,41 @@ func TestPlanFootageErrors(t *testing.T) {
 }
 
 func TestShotArgsFillFrame(t *testing.T) {
-	args := strings.Join(shotArgs(FootageShot{Path: "c.mp4", Offset: 1, Length: 3.5}, 1080, 1920, "s.mp4"), " ")
+	args := strings.Join(shotArgs(FootageShot{Path: "c.mp4", Offset: 1, Length: 3.5}, 0, 1080, 1920, "s.mp4"), " ")
 	for _, want := range []string{"-stream_loop -1 -ss 1.000 -t 3.500 -i c.mp4 -an", "force_original_aspect_ratio=increase,crop=1080:1920", "fps=30", "s.mp4"} {
 		if !strings.Contains(args, want) {
 			t.Errorf("args missing %q: %s", want, args)
 		}
+	}
+}
+
+func TestShotArgsPanPhotos(t *testing.T) {
+	shot := FootageShot{Clip: stock.Clip{Image: true}, Path: "p.jpg", Length: 4}
+	even := strings.Join(shotArgs(shot, 0, 1080, 1920, "s.mp4"), " ")
+	odd := strings.Join(shotArgs(shot, 1, 1080, 1920, "s.mp4"), " ")
+	for _, want := range []string{"-loop 1 -framerate 30 -t 4.000 -i p.jpg", "scale=1242:2208:force_original_aspect_ratio=increase,crop=1080:1920:x='(iw-ow)*t/4.000'"} {
+		if !strings.Contains(even, want) {
+			t.Errorf("missing %q: %s", want, even)
+		}
+	}
+	if !strings.Contains(odd, "x='(iw-ow)*(1-t/4.000)'") {
+		t.Errorf("odd shots should pan the other way: %s", odd)
+	}
+}
+
+func TestFootageLabel(t *testing.T) {
+	if FootageLabel([]stock.Clip{{Provider: stock.ProviderCommons}}) != "footage:commons" ||
+		FootageLabel([]stock.Clip{{Provider: stock.ProviderPexels}, {Provider: stock.ProviderCommons}}) != "footage:mixed" ||
+		FootageLabel([]stock.Clip{{Provider: stock.ProviderPexels}}) != "footage:pexels" {
+		t.Error("labels wrong")
+	}
+}
+
+func TestPickClipTreatsPhotosAsAnyLength(t *testing.T) {
+	pool := []stock.Clip{{Provider: "pexels", ID: 1, Duration: 1}, {Provider: "commons", ID: 1, Image: true}}
+	c, ok := pickClip(pool, map[string]bool{}, 4)
+	if !ok || c.Provider != "commons" {
+		t.Fatalf("picked %+v", c)
 	}
 }
 

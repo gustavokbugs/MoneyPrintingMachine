@@ -38,6 +38,13 @@ func (s *Service) WithFootage(f FootageSource) *Service {
 // FootageAvailable reports whether stock footage can be used.
 func (s *Service) FootageAvailable() bool { return s.footage != nil && s.footage.Available() }
 
+// StockVideoAvailable reports whether the footage source can supply video
+// clips (not only photos).
+func (s *Service) StockVideoAvailable() bool {
+	v, ok := s.footage.(interface{ VideoAvailable() bool })
+	return ok && v.VideoAvailable()
+}
+
 // ShotSeconds is the target length of one stock shot.
 const ShotSeconds = 3.5
 
@@ -142,7 +149,7 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 	if height > width {
 		orientation = "portrait"
 	}
-	used := map[int64]bool{}
+	used := map[string]bool{}
 	searched := map[string][]stock.Clip{}
 	search := func(q string) ([]stock.Clip, error) {
 		if c, ok := searched[q]; ok {
@@ -183,7 +190,7 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 			if !ok {
 				clip = pool[k%len(pool)] // reuse when the pool is exhausted
 			}
-			used[clip.ID] = true
+			used[clipKey(clip)] = true
 			path, err := s.footage.Download(ctx, clip, cacheDir)
 			if err != nil {
 				return nil, err
@@ -201,40 +208,76 @@ func (s *Service) planFootage(ctx context.Context, segs []Timed, queries [][]str
 
 // pickClip returns the first unused clip long enough for the shot, else
 // the first unused one.
-func pickClip(pool []stock.Clip, used map[int64]bool, length float64) (stock.Clip, bool) {
+func pickClip(pool []stock.Clip, used map[string]bool, length float64) (stock.Clip, bool) {
 	for _, c := range pool {
-		if !used[c.ID] && c.Duration >= length {
+		if !used[clipKey(c)] && (c.Image || c.Duration >= length) {
 			return c, true
 		}
 	}
 	for _, c := range pool {
-		if !used[c.ID] {
+		if !used[clipKey(c)] {
 			return c, true
 		}
 	}
 	return stock.Clip{}, false
 }
 
-// shotArgs renders one shot: loop the clip if needed, cut it, fill the
-// frame (scale and center crop), and normalize frame rate and pixels.
-func shotArgs(shot FootageShot, width, height int, out string) []string {
+// clipKey identifies a clip across providers.
+func clipKey(c stock.Clip) string { return c.Provider + ":" + strconv.FormatInt(c.ID, 10) }
+
+// shotArgs renders one shot. Videos loop if needed, are cut, and fill the
+// frame (scale and center crop). Photos are scaled a little larger than
+// the frame and panned slowly, alternating direction by shot index.
+func shotArgs(shot FootageShot, index, width, height int, out string) []string {
 	sec := func(f float64) string { return strconv.FormatFloat(f, 'f', 3, 64) }
-	vf := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,setsar=1,fps=30,eq=contrast=1.04:saturation=1.08", width, height, width, height)
+	grade := "setsar=1,fps=30,eq=contrast=1.04:saturation=1.08"
+	if shot.Clip.Image {
+		// Cover the frame at 115% so there is room to pan.
+		cw, ch := width*115/100, height*115/100
+		x := "(iw-ow)*t/" + sec(shot.Length)
+		if index%2 == 1 {
+			x = "(iw-ow)*(1-t/" + sec(shot.Length) + ")"
+		}
+		vf := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d:x='%s':y='(ih-oh)/2',%s", cw, ch, width, height, x, grade)
+		return []string{"-y", "-hide_banner", "-loglevel", "error", "-loop", "1", "-framerate", "30", "-t", sec(shot.Length),
+			"-i", shot.Path, "-vf", vf, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", out}
+	}
+	vf := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,%s", width, height, width, height, grade)
 	return []string{"-y", "-hide_banner", "-loglevel", "error", "-stream_loop", "-1", "-ss", sec(shot.Offset), "-t", sec(shot.Length),
 		"-i", shot.Path, "-an", "-vf", vf, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", out}
 }
 
 // FootageCredits lists each distinct clip once, in order of use.
 func FootageCredits(shots []FootageShot) []stock.Clip {
-	seen := map[int64]bool{}
+	seen := map[string]bool{}
 	var out []stock.Clip
 	for _, s := range shots {
-		if !seen[s.Clip.ID] {
-			seen[s.Clip.ID] = true
+		if k := clipKey(s.Clip); !seen[k] {
+			seen[k] = true
 			out = append(out, s.Clip)
 		}
 	}
 	return out
+}
+
+// FootageLabel names the providers used, for Output.Visuals.
+func FootageLabel(credits []stock.Clip) string {
+	pexels, commons := false, false
+	for _, c := range credits {
+		if c.Provider == stock.ProviderCommons {
+			commons = true
+		} else {
+			pexels = true
+		}
+	}
+	switch {
+	case pexels && commons:
+		return "footage:mixed"
+	case commons:
+		return "footage:commons"
+	default:
+		return "footage:pexels"
+	}
 }
 
 // renderFootage builds visual.mp4 from stock shots and returns its path
@@ -256,7 +299,7 @@ func (s *Service) renderFootage(ctx context.Context, dir string, segs []Timed, n
 	var list strings.Builder
 	for i, shot := range shots {
 		name := fmt.Sprintf("shot%03d.mp4", i)
-		if _, err := s.runner.Run(ctx, work, s.tools.FFmpeg, shotArgs(shot, width, height, name)...); err != nil {
+		if _, err := s.runner.Run(ctx, work, s.tools.FFmpeg, shotArgs(shot, i, width, height, name)...); err != nil {
 			return "", nil, fmt.Errorf("cut shot %d: %w", i+1, err)
 		}
 		fmt.Fprintf(&list, "file '%s'\n", name)
