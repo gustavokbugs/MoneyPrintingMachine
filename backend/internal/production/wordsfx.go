@@ -22,27 +22,27 @@ const (
 	SFXPop       = "pop"       // bubbles popping, small surprises
 )
 
-// wordSounds maps word stems to effects. A word matches a stem when it
+// wordSounds maps English and Brazilian Portuguese word stems to effects. A word matches a stem when it
 // starts with it, so "burning" and "burnt" match "burn"; a stem ending in
 // "$" matches only that whole word ("ran$" must not match "random").
 var wordSounds = []struct {
 	kind  string
 	stems []string
 }{
-	{SFXHiss, []string{"steam", "sizzl", "hiss", "boil", "fry", "fried", "frying", "scald", "cooking", "cooked", "melt"}},
-	{SFXFire, []string{"burn", "fire", "flame", "blaze", "lava", "torch", "smok", "ignit", "campfire"}},
-	{SFXSplash, []string{"water", "splash", "pour", "shower", "rain", "drip", "drown", "swim", "pool", "flood", "wet$", "soaked", "sink"}},
-	{SFXKnock, []string{"knock", "door"}},
-	{SFXZap, []string{"electric", "shock", "spark", "zap", "lightning", "volt"}},
-	{SFXShatter, []string{"shatter", "glass", "smash", "broke", "breaks", "crack"}},
-	{SFXImpact, []string{"explod", "explosion", "boom", "bomb", "blast", "crash", "slam"}},
-	{SFXHeartbeat, []string{"heart", "scared", "panic", "nervous", "terrif", "fear"}},
-	{SFXWind, []string{"wind", "freez", "frozen", "cold", "ice$", "icy$", "snow", "breeze"}},
-	{SFXCrunch, []string{"crunch", "bite", "chew", "eat$", "eats$", "eating$", "ate$", "snack"}},
-	{SFXClock, []string{"clock", "tick$", "ticks$", "ticking$", "wait", "minute", "hours"}},
-	{SFXWhoosh, []string{"run", "ran$", "jump", "fly", "flew", "throw", "threw", "fall", "fell", "rush", "dash", "zoom"}},
-	{SFXChime, []string{"idea", "realiz", "genius", "ding", "notification", "phone"}},
-	{SFXPop, []string{"pop$", "pops$", "popped$", "popping$", "bubbl", "poof"}},
+	{SFXHiss, []string{"steam", "sizzl", "hiss", "boil", "fry", "fried", "frying", "scald", "cooking", "cooked", "melt", "vapor", "ferv", "frit", "derret", "chiad", "cozinh"}},
+	{SFXFire, []string{"burn", "fire", "flame", "blaze", "lava", "torch", "smok", "ignit", "campfire", "queim", "fogo", "chama", "fumaça", "incênd", "brasa", "fogueira"}},
+	{SFXSplash, []string{"water", "splash", "pour", "shower", "rain", "drip", "drown", "swim", "pool", "flood", "wet$", "soaked", "sink", "água", "chuva", "molhad", "piscina", "banho", "afog", "inund", "goteira", "pinga"}},
+	{SFXKnock, []string{"knock", "door", "porta", "bate$", "bateu$", "batendo$"}},
+	{SFXZap, []string{"electric", "shock", "spark", "zap", "lightning", "volt", "elétric", "eletric", "choque", "faísca", "raio$", "raios$"}},
+	{SFXShatter, []string{"shatter", "glass", "smash", "broke", "breaks", "crack", "vidro", "quebr", "estilhaç", "rachad", "racha$"}},
+	{SFXImpact, []string{"explod", "explosion", "boom", "bomb", "blast", "crash", "slam", "explod", "explos", "bomba", "estrond", "desab"}},
+	{SFXHeartbeat, []string{"heart", "scared", "panic", "nervous", "terrif", "fear", "coração", "medo", "pânico", "nervos"}},
+	{SFXWind, []string{"wind", "freez", "frozen", "cold", "ice$", "icy$", "snow", "breeze", "vento", "frio$", "gelo", "gelad", "congel", "neve"}},
+	{SFXCrunch, []string{"crunch", "bite", "chew", "eat$", "eats$", "eating$", "ate$", "snack", "morde", "mordid", "mastig", "come$", "comeu$", "comendo$"}},
+	{SFXClock, []string{"clock", "tick$", "ticks$", "ticking$", "wait", "minute", "hours", "relógio", "espera$", "esperando$", "minuto"}},
+	{SFXWhoosh, []string{"run", "ran$", "jump", "fly", "flew", "throw", "threw", "fall", "fell", "rush", "dash", "zoom", "corre$", "correu$", "correndo$", "pula$", "pulou$", "voa$", "voou$", "voando$", "cai$", "caiu$", "caindo$", "joga$", "jogou$"}},
+	{SFXChime, []string{"idea", "realiz", "genius", "ding", "notification", "phone", "ideia", "genial", "percebe"}},
+	{SFXPop, []string{"pop$", "pops$", "popped$", "popping$", "bubbl", "poof", "pipoca", "estoura", "bolha"}},
 }
 
 // soundFor returns the effect for a spoken word, or "".
