@@ -78,7 +78,7 @@ func ToolsFromRoot(root string) Tools {
 		FFmpeg:   exe(filepath.Join("ffmpeg", "bin", "ffmpeg.exe")),
 		FFprobe:  exe(filepath.Join("ffmpeg", "bin", "ffprobe.exe")),
 		TTS:      exe(filepath.Join("sherpa-onnx", "bin", "sherpa-onnx-offline-tts.exe")),
-		ModelDir: exe(filepath.Join("models", "kokoro-int8-en-v0_19")),
+		ModelDir: exe(filepath.Join("models", "kokoro-multi-lang-v1_0")),
 		FontsDir: exe("fonts"),
 	}
 }
@@ -86,7 +86,7 @@ func ToolsFromRoot(root string) Tools {
 // Missing lists tools that are not present on disk.
 func (t Tools) Missing() []string {
 	var out []string
-	for name, p := range map[string]string{"ffmpeg": t.FFmpeg, "ffprobe": t.FFprobe, "tts": t.TTS, "voice model": filepath.Join(t.ModelDir, "voices.bin"), "lexicon": filepath.Join(t.ModelDir, "lexicon-en-us.txt"), "fonts": filepath.Join(t.FontsDir, "Inter-Bold.ttf")} {
+	for name, p := range map[string]string{"ffmpeg": t.FFmpeg, "ffprobe": t.FFprobe, "tts": t.TTS, "voice model": filepath.Join(t.ModelDir, "voices.bin"), "lexicon": t.LexiconPath(), "fonts": filepath.Join(t.FontsDir, "Inter-Bold.ttf")} {
 		if _, err := os.Stat(p); err != nil {
 			out = append(out, name)
 		}
@@ -94,19 +94,41 @@ func (t Tools) Missing() []string {
 	return out
 }
 
-// Voices are the Kokoro v0.19 English speakers (speaker ID → name).
+// LexiconPath returns the American English lexicon of the installed model
+// (v1.0 names it lexicon-us-en.txt; v0.19 used lexicon-en-us.txt).
+func (t Tools) LexiconPath() string {
+	v1 := filepath.Join(t.ModelDir, "lexicon-us-en.txt")
+	if _, err := os.Stat(v1); err == nil {
+		return v1
+	}
+	return filepath.Join(t.ModelDir, "lexicon-en-us.txt")
+}
+
+// DefaultVoice is Heart, the highest-rated Kokoro v1.0 English voice.
+const DefaultVoice = 3
+
+// Voices are the English speakers of Kokoro v1.0 offered in the UI
+// (speaker ID in the model → name), best-rated first.
 var Voices = []struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }{
-	{0, "Default (American female)"}, {1, "Bella (American female)"}, {2, "Nicole (American female)"},
-	{3, "Sarah (American female)"}, {4, "Sky (American female)"}, {5, "Adam (American male)"},
-	{6, "Michael (American male)"}, {7, "Emma (British female)"}, {8, "Isabella (British female)"},
-	{9, "George (British male)"}, {10, "Lewis (British male)"},
+	{3, "Heart (American female)"}, {2, "Bella (American female)"}, {6, "Nicole (American female, soft)"},
+	{9, "Sarah (American female)"}, {7, "Nova (American female)"}, {16, "Michael (American male)"},
+	{14, "Fenrir (American male)"}, {18, "Puck (American male)"}, {11, "Adam (American male)"},
+	{21, "Emma (British female)"}, {22, "Isabella (British female)"}, {26, "George (British male)"},
+	{25, "Fable (British male)"}, {24, "Daniel (British male)"},
 }
 
-// ValidVoice reports whether id is a known speaker.
-func ValidVoice(id int) bool { return id >= 0 && id < len(Voices) }
+// ValidVoice reports whether id is an offered speaker.
+func ValidVoice(id int) bool {
+	for _, v := range Voices {
+		if v.ID == id {
+			return true
+		}
+	}
+	return false
+}
 
 // Runner executes an external program with an argument list (no shell).
 type Runner interface {
@@ -168,7 +190,7 @@ func cleanForSpeech(s string) string {
 
 // modelFile picks the Kokoro ONNX file in the model directory.
 func modelFile(dir string) (string, error) {
-	for _, name := range []string{"model.int8.onnx", "model.onnx"} {
+	for _, name := range []string{"model.onnx", "model.int8.onnx"} {
 		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
 			return name, nil
 		}
@@ -186,7 +208,7 @@ func TTSArgs(tools Tools, model string, voice int, text, out string) []string {
 		"--kokoro-model=" + filepath.Join(tools.ModelDir, model),
 		"--kokoro-voices=" + filepath.Join(tools.ModelDir, "voices.bin"),
 		"--kokoro-tokens=" + filepath.Join(tools.ModelDir, "tokens.txt"),
-		"--kokoro-lexicon=" + filepath.Join(tools.ModelDir, "lexicon-en-us.txt"),
+		"--kokoro-lexicon=" + tools.LexiconPath(),
 		"--num-threads=4",
 		"--sid=" + strconv.Itoa(voice),
 		"--output-filename=" + out,
@@ -221,7 +243,9 @@ func (n Narrator) Synthesize(ctx context.Context, voice int, text string) (strin
 	if err := os.MkdirAll(n.CacheDir, 0o755); err != nil {
 		return "", fmt.Errorf("create tts cache: %w", err)
 	}
-	out := filepath.Join(n.CacheDir, CacheKey(model, voice, text)+".wav")
+	// The model directory is part of the key so a model upgrade never reuses
+	// audio from the previous model.
+	out := filepath.Join(n.CacheDir, CacheKey(filepath.Base(n.Tools.ModelDir)+"/"+model, voice, text)+".wav")
 	if st, err := os.Stat(out); err == nil && st.Size() > 44 {
 		return out, nil
 	}

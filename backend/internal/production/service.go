@@ -87,7 +87,7 @@ func (s *Service) CreateFromIdea(ctx context.Context, ownerID, channelID string,
 	target := min(max(idea.SuggestedDurationSecs, 15), 3600)
 	v := &Video{
 		OwnerID: ownerID, ChannelID: ch.ID, IdeaIndex: ideaIndex, Title: idea.WorkingTitle, Format: idea.Format,
-		AspectRatio: aspect, TargetSeconds: target, Status: StatusPlanned, VoiceID: 6, VisualStyle: StyleAuto,
+		AspectRatio: aspect, TargetSeconds: target, Status: StatusPlanned, VoiceID: DefaultVoice, VisualStyle: StyleAuto,
 	}
 	if err := s.store.Create(ctx, v); err != nil {
 		return nil, err
@@ -334,7 +334,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		return nil, fmt.Errorf("create video directory: %w", err)
 	}
 	narrator := Narrator{Tools: s.tools, Runner: s.runner, CacheDir: filepath.Join(s.mediaDir, "tts-cache")}
-	lex, err := LoadLexicon(filepath.Join(s.tools.ModelDir, "lexicon-en-us.txt"))
+	lex, err := LoadLexicon(s.tools.LexiconPath())
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrToolsMissing, err)
 	}
