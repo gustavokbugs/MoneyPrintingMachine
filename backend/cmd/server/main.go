@@ -24,6 +24,7 @@ import (
 	"contentfactory/internal/launchpad"
 	"contentfactory/internal/llm"
 	"contentfactory/internal/postgres"
+	"contentfactory/internal/production"
 	"contentfactory/internal/refresh"
 	"contentfactory/internal/rss"
 	"contentfactory/internal/trends"
@@ -89,6 +90,14 @@ func run(log *slog.Logger) error {
 	engine.WithMeasurer(yt.trends).WithHandleLookup(yt.data).WithNews(feeds)
 
 	handlers := engine.Handlers(channels)
+	// Media tools and rendered files live in the repository's .local folder
+	// (see scripts/setup-media-tools.ps1).
+	localDir := filepath.Join("..", ".local")
+	videos := production.NewService(postgres.NewVideoRepository(pool), channels, model,
+		production.ToolsFromRoot(localDir), production.ExecRunner{}, filepath.Join(localDir, "media"))
+	for k, h := range videos.Handlers() {
+		handlers[k] = h
+	}
 	handlers[refresh.KindTrendRefresh] = refresh.Handler(trends.NewRefresher(watchlist, yt.trends), feeds, jobStore)
 
 	runner := jobs.NewRunner(jobStore, handlers, jobs.RunnerConfig{
@@ -119,6 +128,7 @@ func run(log *slog.Logger) error {
 		Names:      nameChecker{engine: engine, channels: channels},
 		Quota:      yt.budget,
 		Watchlist:  watchlist,
+		Videos:     videos,
 		Feeds:      feeds,
 		Trajectory: yt.trends,
 		WebBaseURL: cfg.WebBaseURL,
