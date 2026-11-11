@@ -98,3 +98,18 @@ export function asVisualStyles(v: unknown): VisualStyle[] {
   }
   return out.length > 0 ? out : ["auto"];
 }
+
+export interface AutopilotResult {
+  channelId: string;
+  generated: string[];
+  notes: string[];
+}
+
+/** asAutopilotResult validates the result of an autopilot job. */
+export function asAutopilotResult(v: unknown): AutopilotResult {
+  if (!isRecord(v) || typeof v.channelId !== "string" || !Array.isArray(v.generated)) {
+    throw new ResponseShapeError("autopilot result");
+  }
+  const strings = (a: unknown) => (Array.isArray(a) ? a.filter((x): x is string => typeof x === "string") : []);
+  return { channelId: v.channelId, generated: strings(v.generated), notes: strings(v.notes) };
+}

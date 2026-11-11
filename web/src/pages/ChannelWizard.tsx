@@ -3,6 +3,7 @@ import { Check, ChevronRight } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Channel } from "../api/types";
+import { AutopilotPanel } from "../components/AutopilotPanel";
 import { ErrorState, SkeletonCard, StatusBadge } from "../components/ui";
 import { t, type MessageKey } from "../i18n";
 import { BlueprintStep } from "./steps/BlueprintStep";
@@ -50,8 +51,9 @@ export function ChannelWizard() {
 
   const requested = params.get("step");
   const step: StepId = isStep(requested) ? requested : "niche";
+  const autopilotJob = params.get("autopilot");
   const goTo = (s: StepId) => {
-    setParams({ step: s });
+    setParams(autopilotJob ? { step: s, autopilot: autopilotJob } : { step: s });
     window.scrollTo({ top: 0 });
     document.getElementById("main")?.focus({ preventScroll: true });
   };
@@ -87,6 +89,8 @@ export function ChannelWizard() {
           <StatusBadge status={c.status} />
         </div>
       </div>
+
+      <AutopilotPanel channel={c} jobId={autopilotJob} onStarted={(j) => setParams({ step, autopilot: j })} />
 
       <nav aria-label={t("wizard.steps")} className="stepper">
         <ol>

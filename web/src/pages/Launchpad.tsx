@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Compass, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api, newIdempotencyKey } from "../api/client";
 import { asNicheReport } from "../api/guards";
 import type { Niche, NicheReport } from "../api/types";
+import { LaunchCard, useStartAutopilot } from "../components/AutopilotPanel";
 import { useConfirm, useToast } from "../components/feedback";
 import { sortNiches, type NicheSort } from "../components/Measured";
 import { NicheCard, heuristicKeys } from "../components/NicheCard";
@@ -41,7 +42,6 @@ function parseReport(result: unknown): NicheReport | null {
 const sourceTone = { connected: "success", not_configured: "warning", unavailable: "neutral" } as const;
 
 export function Launchpad() {
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
@@ -66,15 +66,8 @@ export function Launchpad() {
     },
   });
 
-  const create = useMutation({
-    mutationFn: (niche: string) => api.createChannel({ niche }),
-    onSuccess: (c) => {
-      void qc.invalidateQueries({ queryKey: ["channels"] });
-      toast.success(t("launchpad.created", { niche: c.niche }));
-      navigate(`/channels/${c.id}?step=strategy`);
-    },
-    onError: (err) => toast.error(errorMessage(err)),
-  });
+  // Starting a channel from any niche runs the full automatic setup.
+  const create = useStartAutopilot();
 
   const save = useMutation({
     mutationFn: (n: Niche) => api.saveNiche(n.name, n.description, n),
@@ -128,6 +121,8 @@ export function Launchpad() {
           {t("launchpad.discover")}
         </Button>
       </div>
+
+      <LaunchCard />
 
       <div className="grid-2">
         <div className="stack">
