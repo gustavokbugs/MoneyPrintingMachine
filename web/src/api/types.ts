@@ -367,6 +367,7 @@ export interface VideoOutput {
   /** Provenance of the soundtrack (generated in code). */
   music?: string;
   soundEffects?: number;
+  footage?: FootageCredit[];
 }
 
 export interface Video {
@@ -394,10 +395,11 @@ export interface ProductionStatus {
   voices: { id: number; name: string }[];
   styles: VisualStyle[];
   animatedScenes: boolean;
+  stockFootage: boolean;
 }
 
 /** Visual styles the scene renderer supports; keep in sync with production.Styles. */
-export const visualStyles = ["auto", "minimal", "documentary", "bold", "tech", "gameplay"] as const;
+export const visualStyles = ["auto", "minimal", "documentary", "bold", "tech", "gameplay", "footage"] as const;
 export type VisualStyle = (typeof visualStyles)[number];
 
 export type Privacy = "private" | "unlisted" | "public";
@@ -413,4 +415,12 @@ export interface Publication {
   error: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** FootageCredit credits one stock clip used in a render. */
+export interface FootageCredit {
+  id: number;
+  pageUrl: string;
+  author: string;
+  authorUrl: string;
 }

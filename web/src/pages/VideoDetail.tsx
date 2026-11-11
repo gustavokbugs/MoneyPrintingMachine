@@ -220,6 +220,7 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
             </Button>
           </div>
           <p className="xs muted">{t(`video.styleHelp.${v.visualStyle}`)}</p>
+          {v.visualStyle === "footage" && tools && !tools.stockFootage && <Notice tone="warning">{t("video.footageNoKey")}</Notice>}
           {produceJob.jobId && <JobProgress job={produceJob.job.data} error={produceJob.job.error} />}
           {v.output && (
             <div className="stack-sm">
@@ -250,6 +251,20 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
                   {t("video.soundtrack", { music: v.output.music })} {v.output.soundEffects ? t("video.soundEffects", { count: v.output.soundEffects }) : null}
                 </p>
               )}
+              {v.output.footage && v.output.footage.length > 0 && (
+                <details className="xs muted">
+                  <summary>{t("video.footageCredits", { count: v.output.footage.length })}</summary>
+                  <ul>
+                    {v.output.footage.map((c) => (
+                      <li key={c.id}>
+                        <a href={safeHttps(c.pageUrl)} target="_blank" rel="noreferrer">
+                          {c.author || t("video.footageUnknownAuthor")}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               {v.output.visualsNote && <Notice tone="warning">{v.output.visualsNote}</Notice>}
               {v.output.syntheticVoice && <Notice tone="info">{t("video.disclosure")}</Notice>}
             </div>
@@ -265,9 +280,19 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
 function visualsLabel(visuals: string | undefined): string {
   if (visuals?.startsWith("animated:")) {
     const st = visuals.slice("animated:".length);
-    const known: readonly VisualStyle[] = ["minimal", "documentary", "bold", "tech"];
+    const known: readonly VisualStyle[] = ["minimal", "documentary", "bold", "tech", "gameplay"];
     const match = known.find((k) => k === st);
     return t("video.visuals.animated", { style: match ? t(`video.style.${match}`) : st });
   }
+  if (visuals === "footage:pexels") return t("video.visuals.footage");
   return t("video.visuals.solid");
+}
+
+/** safeHttps keeps only https links from untrusted provider data. */
+function safeHttps(url: string): string | undefined {
+  try {
+    return new URL(url).protocol === "https:" ? url : undefined;
+  } catch {
+    return undefined;
+  }
 }
