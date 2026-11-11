@@ -86,6 +86,7 @@ const footageSystemPrompt = `You pick stock video search queries for narrated vi
 Rules:
 - For each segment, give 2 or 3 short English queries (2 to 4 words) describing something a camera can film that matches the narration.
 - Use concrete, filmable subjects (places, objects, nature, people doing things). No abstract ideas, no text, no logos, brands, or famous people.
+- Every query names a subject (for example "bacteria culture dish" or "army hospital ward"). Never a date, year, or number alone.
 - Respond only with JSON matching the schema.`
 
 // cleanQuery keeps letters, digits, and spaces, at most 6 words.
