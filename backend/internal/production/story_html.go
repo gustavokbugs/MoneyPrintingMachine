@@ -54,9 +54,12 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
 </head>
 <body>
 <div id="root" data-composition-id="main" data-start="0" data-duration="{{sec .Total}}" data-width="{{.Width}}" data-height="{{.Height}}">
-  <div class="bg clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="0">
+{{if .HasBG}}  <video id="bgv" class="clip" src="assets/bg.mp4" muted playsinline data-start="0" data-duration="{{sec .Total}}" data-track-index="0"
+    style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>
+{{else}}  <div class="bg clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="0">
     <canvas id="game" width="{{.Width}}" height="{{.Height}}"></canvas>
   </div>
+{{end}}
 {{if .Scenes}}{{with index .Scenes 0}}  <div class="hook clip" id="hook" data-start="0" data-duration="{{sec .Duration}}" data-track-index="1">
     <div class="who"><span class="dot"></span><span>{{$.ChannelName}}</span></div>
     <div class="title">{{if $.HookText}}{{$.HookText}}{{else}}{{.Headline}}{{end}}</div>
@@ -165,7 +168,7 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
   var clouds = [];
   for (var c = 0; c < 9; c++) clouds.push({ x: rand() * W * 1.6, y: H * (0.05 + rand() * 0.35), s: U * (5 + rand() * 7) });
 
-  var cv = document.getElementById("game"), g = cv.getContext("2d");
+  var cv = document.getElementById("game"), g = cv ? cv.getContext("2d") : null;
   var score = 0;
   function draw(t) {
     var cam = SPEED * t, wx = cam + BALLX;
@@ -255,9 +258,12 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
     g.fillText(String(score), W - U * 17, H * 0.035 + U * 4.3);
   }
 
+  // The drawn game, unless the owner's own clip plays in the background.
   var clock = { t: 0 };
-  draw(0);
-  tl.to(clock, { t: TOTAL, duration: TOTAL, ease: "none", onUpdate: function () { draw(clock.t); } }, 0);
+  if (g) {
+    draw(0);
+    tl.to(clock, { t: TOTAL, duration: TOTAL, ease: "none", onUpdate: function () { draw(clock.t); } }, 0);
+  }
   tl.to(".progress-fill", { scaleX: 1, duration: TOTAL, ease: "none" }, 0);
 
   // Hook card pops in on the opening impact.

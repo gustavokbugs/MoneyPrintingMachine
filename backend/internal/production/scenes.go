@@ -335,6 +335,9 @@ type ProjectInput struct {
 	// HookText is the full hook for the gameplay story's card; scene
 	// headlines are shortened for big type.
 	HookText string
+	// Background is a prepared clip (already cropped and trimmed) to play
+	// behind the gameplay story instead of the drawn game.
+	Background string
 }
 
 type projectView struct {
@@ -347,6 +350,7 @@ type projectView struct {
 	Data          []sceneData
 	CaptionData   []captionData
 	PopData       []popData
+	HasBG         bool
 }
 
 type popData struct {
@@ -404,6 +408,12 @@ func WriteProject(dir string, in ProjectInput, gsapPath, fontsPkgDir string) err
 	tmpl := projectTemplate
 	if in.Style == StyleGameplay {
 		tmpl = storyTemplate
+		if in.Background != "" {
+			if err := copyFile(in.Background, filepath.Join(dir, "assets", "bg.mp4")); err != nil {
+				return fmt.Errorf("copy background: %w", err)
+			}
+			v.HasBG = true
+		}
 		for i, p := range in.Pops {
 			ext := strings.ToLower(filepath.Ext(p.Path))
 			if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {

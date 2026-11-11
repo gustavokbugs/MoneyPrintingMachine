@@ -71,7 +71,7 @@ Channels reach **Ready** only after a platform connection is verified by the pla
 
    Without `renderer/`, videos render on a plain background.
 
-   The script also installs the small Parakeet model that times captions to the voice. For the **Stock footage** style, an optional free `PEXELS_API_KEY` in `backend/.env` adds real video clips; without it the style uses free-licensed Wikimedia Commons photos. To stop a photo or clip from ever being used again, add `provider:id` (for example `commons:30164544`, shown in the video's credits) as a line in `.local/media/stock-blocklist.txt`.
+   The script also installs the small Parakeet model that times captions to the voice. For the **Stock footage** style, an optional free `PEXELS_API_KEY` in `backend/.env` adds real video clips; without it the style uses free-licensed Wikimedia Commons photos. To stop a photo or clip from ever being used again, add `provider:id` (for example `commons:30164544`, shown in the video's credits) as a line in `.local/media/stock-blocklist.txt`. To use your own background clips (for example gameplay you recorded) in the Gameplay story style, put videos in `.local/media/backgrounds/`; each render picks one, crops it to the frame, and mutes it. Use only footage you have the rights to.
 
 ## YouTube setup (optional)
 

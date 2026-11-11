@@ -448,6 +448,17 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		}
 	}
 	var pops []ImagePop
+	background := ""
+	if resolved == StyleGameplay && s.tools.AnimatedScenes() {
+		// The owner's own clip replaces the drawn game when there is one.
+		var name string
+		if background, name, err = s.prepareBackground(rctx, dir, seedOf(v.ID), total, width, height); err != nil {
+			note = strings.TrimSpace(note + " The background clip was skipped: " + truncateErr(err, 200))
+			background = ""
+		} else if name != "" {
+			note = strings.TrimSpace(note + " Background clip: " + name + ".")
+		}
+	}
 	captions := captionsFor(resolved, segs, width, height)
 	if resolved == StyleGameplay && s.tools.AnimatedScenes() {
 		// Key words: a photo pops up on each fix word, and captions color
@@ -466,7 +477,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		visual, err = s.renderScenes(rctx, dir, ProjectInput{
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
 			ChannelName: ch.Name, Scenes: scenes, Captions: captions, Seed: seedOf(v.ID),
-			Pops: pops, HookText: hookText(segs),
+			Pops: pops, HookText: hookText(segs), Background: background,
 		})
 		if err != nil {
 			visual, note = "", "Animated scenes failed, so a plain background was used: "+truncateErr(err, 300)
