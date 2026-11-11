@@ -11,6 +11,7 @@ import (
 	"contentfactory/internal/connections"
 	"contentfactory/internal/jobs"
 	"contentfactory/internal/launchpad"
+	"contentfactory/internal/production"
 	"contentfactory/internal/rss"
 	"contentfactory/internal/trends"
 	"contentfactory/internal/youtube"
@@ -73,6 +74,7 @@ func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
 func (s *server) writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 	var ve *channel.ValidationError
 	var te *channel.TransitionError
+	var stateErr *production.StateError
 	switch {
 	case errors.As(err, &ve):
 		writeFieldError(w, http.StatusUnprocessableEntity, "validation_failed", ve.Error(), ve.Field)
@@ -104,6 +106,16 @@ func (s *server) writeDomainError(w http.ResponseWriter, r *http.Request, err er
 		writeError(w, http.StatusBadGateway, "upstream_unavailable", "YouTube could not be reached. Try again shortly.")
 	case errors.Is(err, trends.ErrInvalidQuery):
 		writeFieldError(w, http.StatusUnprocessableEntity, "validation_failed", err.Error(), "query")
+	case errors.As(err, &stateErr):
+		writeError(w, http.StatusConflict, "invalid_state", stateErr.Error())
+	case errors.Is(err, production.ErrNotFound):
+		writeError(w, http.StatusNotFound, "video_not_found", "Video or file not found.")
+	case errors.Is(err, production.ErrExists):
+		writeError(w, http.StatusConflict, "video_exists", err.Error())
+	case errors.Is(err, production.ErrConflict):
+		writeError(w, http.StatusConflict, "conflict", "The video was modified by another operation. Reload and try again.")
+	case errors.Is(err, production.ErrToolsMissing):
+		writeError(w, http.StatusServiceUnavailable, "tools_missing", err.Error())
 	case errors.Is(err, trends.ErrWatchNotFound):
 		writeError(w, http.StatusNotFound, "watch_not_found", "Watched query not found. Channel niches are managed by their channels.")
 	case errors.Is(err, rss.ErrFeedNotFound):

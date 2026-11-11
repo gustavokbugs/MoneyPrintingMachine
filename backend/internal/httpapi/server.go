@@ -14,6 +14,7 @@ import (
 	"contentfactory/internal/jobs"
 	"contentfactory/internal/launchpad"
 	"contentfactory/internal/platforms"
+	"contentfactory/internal/production"
 )
 
 // JobQueue enqueues and reads background jobs.
@@ -54,7 +55,9 @@ type Deps struct {
 	Names   NameChecker
 	Quota   QuotaUsage
 	// Trend refresh and news feeds; nil disables their endpoints.
-	Watchlist  WatchManager
+	Watchlist WatchManager
+	// Videos enables the production pipeline endpoints.
+	Videos     Videos
 	Feeds      FeedManager
 	Trajectory TrajectorySource
 	// WebBaseURL is where the browser returns after OAuth.
@@ -116,6 +119,20 @@ func NewHandler(d Deps) http.Handler {
 		mux.HandleFunc("DELETE /api/trends/feeds/{id}", s.deleteFeed)
 		mux.HandleFunc("GET /api/trends/mentions", s.mentions)
 		mux.HandleFunc("POST /api/trends/refresh", s.refreshNow)
+	}
+
+	if d.Videos != nil {
+		mux.HandleFunc("GET /api/production/status", s.productionStatus)
+		mux.HandleFunc("GET /api/channels/{id}/videos", s.listVideos)
+		mux.HandleFunc("POST /api/channels/{id}/videos", s.createVideo)
+		mux.HandleFunc("GET /api/videos/{id}", s.getVideo)
+		mux.HandleFunc("PUT /api/videos/{id}/script", s.putScript)
+		mux.HandleFunc("PUT /api/videos/{id}/claims/{index}", s.reviewClaim)
+		mux.HandleFunc("POST /api/videos/{id}/approve", s.approveVideo)
+		mux.HandleFunc("PUT /api/videos/{id}/voice", s.setVoice)
+		mux.HandleFunc("POST /api/videos/{id}/script/generate", s.startVideoJob(production.KindScript, d.Videos.CheckCanScript))
+		mux.HandleFunc("POST /api/videos/{id}/produce", s.startVideoJob(production.KindProduce, d.Videos.CheckCanProduce))
+		mux.HandleFunc("GET /api/videos/{id}/media/{file}", s.videoMedia)
 	}
 
 	mux.HandleFunc("GET /api/platforms", s.listPlatforms)
