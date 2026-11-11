@@ -15,6 +15,7 @@ import (
 	"contentfactory/internal/channel"
 	"contentfactory/internal/jobs"
 	"contentfactory/internal/production"
+	"contentfactory/internal/stock"
 	"contentfactory/internal/youtube"
 )
 
@@ -166,12 +167,29 @@ func Description(ch *channel.Channel, v *production.Video) string {
 		}
 	}
 	if v.Output != nil && len(v.Output.Footage) > 0 {
-		// Pexels asks for credit to the platform and its creators.
-		credits := []string{"Stock footage from Pexels (https://www.pexels.com):"}
+		// Pexels asks for credit to the platform and its creators; Commons
+		// attribution licenses require author and license.
+		var pexels, commons []string
 		for _, c := range v.Output.Footage {
-			credits = append(credits, "- "+c.Author+" "+c.PageURL)
+			if c.Provider == stock.ProviderCommons {
+				line := "- " + c.Title
+				if c.Author != "" {
+					line += " by " + c.Author
+				}
+				if c.License != "" {
+					line += " (" + c.License + ")"
+				}
+				commons = append(commons, line+" "+c.PageURL)
+			} else {
+				pexels = append(pexels, "- "+c.Author+" "+c.PageURL)
+			}
 		}
-		parts = append(parts, strings.Join(credits, "\n"))
+		if len(pexels) > 0 {
+			parts = append(parts, "Stock footage from Pexels (https://www.pexels.com):\n"+strings.Join(pexels, "\n"))
+		}
+		if len(commons) > 0 {
+			parts = append(parts, "Images from Wikimedia Commons:\n"+strings.Join(commons, "\n"))
+		}
 	}
 	if v.Output != nil && v.Output.SyntheticVoice {
 		parts = append(parts, "Narration uses a synthetic (AI-generated) voice.")

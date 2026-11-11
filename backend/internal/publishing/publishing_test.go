@@ -169,3 +169,13 @@ func TestDescriptionCreditsStockFootage(t *testing.T) {
 		t.Error("credits shown without footage")
 	}
 }
+
+func TestDescriptionCreditsCommonsLicenses(t *testing.T) {
+	v := &production.Video{Output: &production.Output{Footage: []stock.Clip{
+		{Provider: stock.ProviderCommons, Title: "Moon B", Author: "Jane", License: "CC BY-SA 4.0", PageURL: "https://commons.wikimedia.org/wiki/File:Moon_B.jpg"},
+	}}}
+	d := Description(&channel.Channel{}, v)
+	if !strings.Contains(d, "Images from Wikimedia Commons:\n- Moon B by Jane (CC BY-SA 4.0) https://commons.wikimedia.org/wiki/File:Moon_B.jpg") || strings.Contains(d, "Pexels") {
+		t.Errorf("description:\n%s", d)
+	}
+}
