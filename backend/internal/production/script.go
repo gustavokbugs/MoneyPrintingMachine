@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -148,13 +149,15 @@ func scriptFromOutput(o scriptOutput, model string, now time.Time) *Script {
 		if len(on) > 120 {
 			on = on[:120]
 		}
+		narration, label := stripSpeakerLabel(clean(sec.Narration))
 		speaker := ""
-		if sec.Speaker == "B" {
-			speaker = "B"
-		} else if sec.Speaker == "A" {
-			speaker = "A"
+		switch {
+		case sec.Speaker == "A" || sec.Speaker == "B":
+			speaker = sec.Speaker
+		case label != "":
+			speaker = label
 		}
-		sc.Sections = append(sc.Sections, Section{Heading: clean(sec.Heading), Narration: clean(sec.Narration), OnScreenText: on, Speaker: speaker})
+		sc.Sections = append(sc.Sections, Section{Heading: clean(sec.Heading), Narration: narration, OnScreenText: on, Speaker: speaker})
 	}
 	seen := map[string]bool{}
 	for _, c := range o.Claims {
@@ -166,4 +169,18 @@ func scriptFromOutput(o scriptOutput, model string, now time.Time) *Script {
 		sc.Claims = append(sc.Claims, Claim{Text: text, SourceHint: clean(c.SourceHint), Status: ClaimUnverified})
 	}
 	return sc
+}
+
+// speakerLabel matches a leading role label the model sometimes writes
+// into the narration ("Speaker A:", "Narrator:", "Host -").
+var speakerLabel = regexp.MustCompile(`(?i)^\s*(?:\*\*)?(speaker\s*([ab])|narrator|host|expert|character|pro|con)(?:\*\*)?\s*[:\-–—](?:\*\*)?\s*`)
+
+// stripSpeakerLabel removes such a label so it is not read aloud. It
+// returns "A" or "B" when the label names the speaker explicitly.
+func stripSpeakerLabel(s string) (string, string) {
+	m := speakerLabel.FindStringSubmatch(s)
+	if m == nil {
+		return s, ""
+	}
+	return strings.TrimSpace(s[len(m[0]):]), strings.ToUpper(m[2])
 }

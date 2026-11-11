@@ -91,3 +91,19 @@ func TestWordCaptionsKeepSpeakersApart(t *testing.T) {
 		t.Error("second speaker not colored")
 	}
 }
+func TestStripSpeakerLabel(t *testing.T) {
+	cases := []struct{ in, text, speaker string }{
+		{"Speaker A: Fleming noticed mold.", "Fleming noticed mold.", "A"},
+		{"speaker b - But he published in 1929.", "But he published in 1929.", "B"},
+		{"**Speaker B:** Not quite.", "Not quite.", "B"},
+		{"Narrator: It was 1928.", "It was 1928.", ""},
+		{"Hostile bacteria died.", "Hostile bacteria died.", ""},
+		{"Speakers at the time: none.", "Speakers at the time: none.", ""},
+	}
+	for _, c := range cases {
+		text, speaker := stripSpeakerLabel(c.in)
+		if text != c.text || speaker != c.speaker {
+			t.Errorf("stripSpeakerLabel(%q) = %q, %q; want %q, %q", c.in, text, speaker, c.text, c.speaker)
+		}
+	}
+}
