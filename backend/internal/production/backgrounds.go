@@ -2,6 +2,8 @@ package production
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +28,8 @@ func listBackgrounds(dir string) []string {
 	}
 	var out []string
 	for _, e := range entries {
-		if !e.IsDir() && backgroundExts[strings.ToLower(filepath.Ext(e.Name()))] {
+		// Skip clips still being written (see CutBackgrounds).
+		if !e.IsDir() && backgroundExts[strings.ToLower(filepath.Ext(e.Name()))] && !strings.Contains(e.Name(), ".tmp.") {
 			out = append(out, filepath.Join(dir, e.Name()))
 		}
 	}
@@ -82,4 +85,83 @@ func (s *Service) prepareBackground(ctx context.Context, dir string, seed uint32
 		return "", "", fmt.Errorf("prepare background: %w", err)
 	}
 	return out, filepath.Base(src), nil
+}
+
+// SourcesDir, inside BackgroundsDir, holds long source videos that
+// CutBackgrounds splits into ready-to-use vertical clips.
+const SourcesDir = "sources"
+
+// cutStarts spreads up to count non-overlapping clips of length seconds
+// evenly across a source, skipping its first and last two seconds
+// (intros, fades, outros).
+func cutStarts(duration, length float64, count int) []float64 {
+	usable := duration - 4
+	n := min(count, int(usable/length))
+	if n <= 0 {
+		return nil
+	}
+	if n == 1 {
+		return []float64{2}
+	}
+	step := (usable - length) / float64(n-1)
+	out := make([]float64, n)
+	for i := range out {
+		out[i] = 2 + float64(i)*step
+	}
+	return out
+}
+
+// cutName names clip i (from 1) of a source: a short safe form of its
+// name plus a fingerprint of the full name, so similar names never clash.
+func cutName(src string, i int) string {
+	base := strings.TrimSuffix(filepath.Base(src), filepath.Ext(src))
+	var b strings.Builder
+	for _, r := range strings.ToLower(base) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case b.Len() > 0 && !strings.HasSuffix(b.String(), "-"):
+			b.WriteByte('-')
+		}
+	}
+	name := strings.Trim(b.String(), "-")
+	if len(name) > 40 {
+		name = strings.Trim(name[:40], "-")
+	}
+	if name == "" {
+		name = "clip"
+	}
+	sum := sha256.Sum256([]byte(filepath.Base(src)))
+	return fmt.Sprintf("%s-%s-%02d.mp4", name, hex.EncodeToString(sum[:3]), i)
+}
+
+// CutBackgrounds splits every source video into up to count vertical
+// clips of length seconds (cropped to width x height and muted) in the
+// backgrounds folder. Existing clips are kept, so it can be re-run after
+// adding sources. It returns the paths of the clips it made.
+func CutBackgrounds(ctx context.Context, tools Tools, runner Runner, mediaDir string, count int, length float64, width, height int) ([]string, error) {
+	outDir := filepath.Join(mediaDir, BackgroundsDir)
+	var made []string
+	for _, src := range listBackgrounds(filepath.Join(outDir, SourcesDir)) {
+		d, err := ProbeDuration(ctx, runner, tools.FFprobe, src)
+		if err != nil {
+			return made, fmt.Errorf("read %s: %w", filepath.Base(src), err)
+		}
+		for i, start := range cutStarts(d, length, count) {
+			out := filepath.Join(outDir, cutName(src, i+1))
+			if st, err := os.Stat(out); err == nil && st.Size() > 0 {
+				continue
+			}
+			tmp := strings.TrimSuffix(out, ".mp4") + ".tmp.mp4"
+			if _, err := runner.Run(ctx, outDir, tools.FFmpeg, BackgroundArgs(src, start, length, width, height, tmp)...); err != nil {
+				_ = os.Remove(tmp)
+				return made, fmt.Errorf("cut %s: %w", filepath.Base(out), err)
+			}
+			if err := os.Rename(tmp, out); err != nil {
+				return made, fmt.Errorf("store %s: %w", filepath.Base(out), err)
+			}
+			made = append(made, out)
+		}
+	}
+	return made, nil
 }

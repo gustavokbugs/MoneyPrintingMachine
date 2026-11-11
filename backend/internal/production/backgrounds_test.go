@@ -1,6 +1,7 @@
 package production
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,4 +73,64 @@ func TestWriteProjectWithBackgroundClip(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "assets", "bg.mp4")); err != nil {
 		t.Error("background not copied into the project")
 	}
+}
+
+func TestCutStarts(t *testing.T) {
+	got := cutStarts(638, 60, 10)
+	if len(got) != 10 || got[0] != 2 || got[9]+60 > 636+1e-9 {
+		t.Fatalf("starts = %v", got)
+	}
+	for i := 1; i < len(got); i++ {
+		if got[i]-got[i-1] < 60 {
+			t.Fatalf("clips overlap: %v", got)
+		}
+	}
+	if got := cutStarts(150, 60, 10); len(got) != 2 {
+		t.Errorf("2.5 minutes fits 2 clips, got %v", got)
+	}
+	if got := cutStarts(63, 60, 10); len(got) != 0 {
+		t.Errorf("too short = %v", got)
+	}
+}
+
+func TestCutNamesNeverClash(t *testing.T) {
+	a := cutName("x/vidssave.com Minecraft Parkour Gameplay No Copyright 4K 720P.mp4", 1)
+	b := cutName("x/vidssave.com Minecraft Parkour Gameplay No Copyright 4K 720P (1).mp4", 1)
+	if a == b || !strings.HasSuffix(a, "-01.mp4") || strings.ContainsAny(a, " ()") {
+		t.Errorf("names %q and %q", a, b)
+	}
+	if cutName("x/!!!.mp4", 3) == "" {
+		t.Error("empty base name")
+	}
+}
+
+func TestCutBackgrounds(t *testing.T) {
+	media := t.TempDir()
+	src := filepath.Join(media, BackgroundsDir, SourcesDir)
+	_ = os.MkdirAll(src, 0o755)
+	_ = os.WriteFile(filepath.Join(src, "parkour.mp4"), []byte("x"), 0o644)
+	r := cutRunner{}
+	made, err := CutBackgrounds(context.Background(), Tools{FFmpeg: "ffmpeg", FFprobe: "ffprobe"}, r, media, 10, 60, 1080, 1920)
+	if err != nil || len(made) != 3 {
+		t.Fatalf("made %v, %v (190 s fits 3 clips)", made, err)
+	}
+	clips := listBackgrounds(filepath.Join(media, BackgroundsDir))
+	if len(clips) != 3 {
+		t.Fatalf("clips ready for renders = %v", clips)
+	}
+	// Re-running keeps finished clips.
+	again, err := CutBackgrounds(context.Background(), Tools{FFmpeg: "ffmpeg", FFprobe: "ffprobe"}, r, media, 10, 60, 1080, 1920)
+	if err != nil || len(again) != 0 {
+		t.Errorf("re-run made %v, %v", again, err)
+	}
+}
+
+// cutRunner reports a 190 s source to ffprobe and writes ffmpeg outputs.
+type cutRunner struct{}
+
+func (cutRunner) Run(_ context.Context, _, name string, args ...string) ([]byte, error) {
+	if name == "ffprobe" {
+		return []byte("190\n"), nil
+	}
+	return nil, os.WriteFile(args[len(args)-1], []byte("clip"), 0o644)
 }
