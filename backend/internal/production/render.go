@@ -17,6 +17,8 @@ type Timed struct {
 	// Words holds the start time of each word of Text (split on spaces),
 	// relative to the segment, when it was measured from the audio.
 	Words []float64
+	// Speaker is "B" for the second voice of a dialogue.
+	Speaker string
 }
 
 // wordStarts returns the start of each word of s.Text within the segment:
@@ -72,6 +74,7 @@ func CaptionChunks(text string, maxWords int) []string {
 type Cue struct {
 	Start, End float64
 	Text       string
+	Speaker    string
 }
 
 // Cues times each segment's caption chunks: a chunk starts with its first
@@ -92,7 +95,7 @@ func Cues(segs []Timed, maxWords int) []Cue {
 			if len(cues) == first {
 				start = 0 // the first chunk covers any leading silence
 			}
-			cues = append(cues, Cue{Start: offset + start, Text: c})
+			cues = append(cues, Cue{Start: offset + start, Text: c, Speaker: s.Speaker})
 			idx += len(strings.Fields(c))
 		}
 		for i := first; i < len(cues); i++ {
@@ -185,8 +188,11 @@ func BuildWordASS(chunks []CaptionChunk, width, height int) string {
 			continue
 		}
 		color := ""
-		if c.Hot {
+		switch {
+		case c.Hot:
 			color = `\c&H004DE1FF&` // #FFE14D in ASS BGR order
+		case c.Speaker == "B":
+			color = `\c&H00FFDB7F&` // #7FDBFF: the second voice
 		}
 		size := int(unit * captionFontUnits(c))
 		fmt.Fprintf(&b, "Dialogue: 0,%s,%s,Word,,0,0,0,,{\\pos(%d,%d)\\fs%d%s\\fscx55\\fscy55\\t(0,140,\\fscx100\\fscy100)}%s\n",

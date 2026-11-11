@@ -19,6 +19,7 @@ type Videos interface {
 	Approve(ctx context.Context, ownerID, id string) (*production.Video, error)
 	SetVoice(ctx context.Context, ownerID, id string, voice int) (*production.Video, error)
 	SetStyle(ctx context.Context, ownerID, id, style string) (*production.Video, error)
+	SetDialogue(ctx context.Context, ownerID, id, mode string, voiceB int) (*production.Video, error)
 	AnimatedScenes() bool
 	StockVideoAvailable() bool
 	CheckCanScript(ctx context.Context, ownerID, id string) (*production.Video, error)
@@ -33,7 +34,7 @@ func (s *server) productionStatus(w http.ResponseWriter, _ *http.Request) {
 		missing = []string{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ready": len(missing) == 0, "missing": missing, "voices": production.Voices,
-		"styles": production.Styles, "animatedScenes": s.Videos.AnimatedScenes(), "stockFootage": s.Videos.StockVideoAvailable()})
+		"styles": production.Styles, "animatedScenes": s.Videos.AnimatedScenes(), "stockFootage": s.Videos.StockVideoAvailable(), "dialogueModes": production.DialogueModes})
 }
 
 func (s *server) listVideos(w http.ResponseWriter, r *http.Request) {
@@ -126,6 +127,24 @@ func (s *server) setVoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, err := s.Videos.SetVoice(r.Context(), s.OwnerID, r.PathValue("id"), req.VoiceID)
+	if err != nil {
+		s.writeDomainError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+type dialogueRequest struct {
+	DialogueMode string `json:"dialogueMode"`
+	VoiceB       int    `json:"voiceB"`
+}
+
+func (s *server) setDialogue(w http.ResponseWriter, r *http.Request) {
+	var req dialogueRequest
+	if !decode(w, r, &req) {
+		return
+	}
+	v, err := s.Videos.SetDialogue(r.Context(), s.OwnerID, r.PathValue("id"), req.DialogueMode, req.VoiceB)
 	if err != nil {
 		s.writeDomainError(w, r, err)
 		return

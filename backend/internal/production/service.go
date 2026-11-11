@@ -91,6 +91,7 @@ func (s *Service) CreateFromIdea(ctx context.Context, ownerID, channelID string,
 	v := &Video{
 		OwnerID: ownerID, ChannelID: ch.ID, IdeaIndex: ideaIndex, Title: idea.WorkingTitle, Format: idea.Format,
 		AspectRatio: aspect, TargetSeconds: target, Status: StatusPlanned, VoiceID: DefaultVoice, VisualStyle: StyleAuto,
+		DialogueMode: DialogueNarration, VoiceB: DefaultVoiceB,
 	}
 	if err := s.store.Create(ctx, v); err != nil {
 		return nil, err
@@ -383,7 +384,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	var kickers []string
 	total := 0.0
 	for i, seg := range segments {
-		wav, err := narrator.Synthesize(ctx, v.VoiceID, spoken[i])
+		wav, err := narrator.Synthesize(ctx, v.voiceFor(seg.Speaker), spoken[i])
 		if err != nil {
 			return nil, fmt.Errorf("narrate segment %d: %w", i+1, err)
 		}
@@ -395,7 +396,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		if title == "" {
 			title = seg.Heading
 		}
-		tm := Timed{Audio: wav, Duration: d, Title: title, Text: seg.Narration}
+		tm := Timed{Audio: wav, Duration: d, Title: title, Text: seg.Narration, Speaker: seg.Speaker}
 		if timing == "measured" {
 			// Alignment only improves captions; an error falls back to estimates.
 			if words, err := aligner.WordTimes(ctx, wav, seg.Narration, d); err == nil {

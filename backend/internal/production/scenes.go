@@ -216,6 +216,8 @@ type CaptionChunk struct {
 	Words      []CaptionWord
 	// Hot marks a chunk to highlight (a number or a long key word).
 	Hot bool
+	// Speaker is "B" when the second voice says it.
+	Speaker string
 }
 
 // CaptionTrack splits narration into short caption lines and times every
@@ -255,10 +257,10 @@ func WordCaptions(segs []Timed) []CaptionChunk {
 	cues := Cues(segs, 1)
 	for i := 0; i < len(cues); i++ {
 		c := cues[i]
-		ch := CaptionChunk{Start: c.Start, End: c.End, Words: []CaptionWord{{Text: c.Text, At: c.Start}}}
+		ch := CaptionChunk{Start: c.Start, End: c.End, Words: []CaptionWord{{Text: c.Text, At: c.Start}}, Speaker: c.Speaker}
 		word := strings.Trim(c.Text, captionPunct)
 		if i+1 < len(cues) && len([]rune(word)) <= 3 && word == c.Text &&
-			len([]rune(c.Text))+1+len([]rune(cues[i+1].Text)) <= 12 && cues[i+1].Start-c.End < 0.01 {
+			len([]rune(c.Text))+1+len([]rune(cues[i+1].Text)) <= 12 && cues[i+1].Start-c.End < 0.01 && cues[i+1].Speaker == c.Speaker {
 			n := cues[i+1]
 			ch.Words = append(ch.Words, CaptionWord{Text: n.Text, At: n.Start})
 			ch.End = n.End

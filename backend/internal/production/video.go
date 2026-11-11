@@ -5,13 +5,13 @@
 package production
 
 import (
-	"contentfactory/internal/stock"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"contentfactory/internal/channel"
+	"contentfactory/internal/stock"
 )
 
 // Status is a video lifecycle state.
@@ -60,6 +60,8 @@ type Section struct {
 	Heading      string `json:"heading"`
 	Narration    string `json:"narration"`
 	OnScreenText string `json:"onScreenText"`
+	// Speaker is "A" or "B" in two-voice scripts ("" means A).
+	Speaker string `json:"speaker,omitempty"`
 }
 
 // Claim is a factual statement that a person must verify or remove before
@@ -115,6 +117,9 @@ func (s Script) Validate() error {
 	for i, sec := range s.Sections {
 		if strings.TrimSpace(sec.Narration) == "" {
 			return &channel.ValidationError{Field: fmt.Sprintf("sections[%d].narration", i), Message: "is required"}
+		}
+		if sec.Speaker != "" && sec.Speaker != "A" && sec.Speaker != "B" {
+			return &channel.ValidationError{Field: fmt.Sprintf("sections[%d].speaker", i), Message: "must be A or B"}
 		}
 		if len(sec.Narration) > 4000 || len(sec.OnScreenText) > 120 || len(sec.Heading) > 200 {
 			return &channel.ValidationError{Field: fmt.Sprintf("sections[%d]", i), Message: "narration max 4000, on-screen text max 120, heading max 200 characters"}
@@ -179,23 +184,27 @@ type Output struct {
 
 // Video is one production unit.
 type Video struct {
-	ID            string    `json:"id"`
-	OwnerID       string    `json:"-"`
-	ChannelID     string    `json:"channelId"`
-	IdeaIndex     int       `json:"ideaIndex"`
-	Title         string    `json:"title"`
-	Format        string    `json:"format"`
-	AspectRatio   string    `json:"aspectRatio"`
-	TargetSeconds int       `json:"targetSeconds"`
-	Status        Status    `json:"status"`
-	StatusReason  string    `json:"statusReason"`
-	VoiceID       int       `json:"voiceId"`
-	VisualStyle   string    `json:"visualStyle"`
-	Script        *Script   `json:"script"`
-	Output        *Output   `json:"output"`
-	Version       int       `json:"version"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	ID            string `json:"id"`
+	OwnerID       string `json:"-"`
+	ChannelID     string `json:"channelId"`
+	IdeaIndex     int    `json:"ideaIndex"`
+	Title         string `json:"title"`
+	Format        string `json:"format"`
+	AspectRatio   string `json:"aspectRatio"`
+	TargetSeconds int    `json:"targetSeconds"`
+	Status        Status `json:"status"`
+	StatusReason  string `json:"statusReason"`
+	VoiceID       int    `json:"voiceId"`
+	VisualStyle   string `json:"visualStyle"`
+	// DialogueMode chooses one narrator or a two-voice script; VoiceB is
+	// the second speaker's voice.
+	DialogueMode string    `json:"dialogueMode"`
+	VoiceB       int       `json:"voiceB"`
+	Script       *Script   `json:"script"`
+	Output       *Output   `json:"output"`
+	Version      int       `json:"version"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 // CanStartScript reports whether script generation may start.

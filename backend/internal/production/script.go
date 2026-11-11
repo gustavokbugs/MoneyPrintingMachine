@@ -21,6 +21,7 @@ type scriptOutput struct {
 		Heading      string `json:"heading"`
 		Narration    string `json:"narration"`
 		OnScreenText string `json:"onScreenText"`
+		Speaker      string `json:"speaker,omitempty"`
 	} `json:"sections"`
 	Outro  string `json:"outro"`
 	Claims []struct {
@@ -29,7 +30,7 @@ type scriptOutput struct {
 	} `json:"claims"`
 }
 
-func scriptSchema(minSections, maxSections int) json.RawMessage {
+func scriptSchema(minSections, maxSections int, dialogue bool) json.RawMessage {
 	str := map[string]any{"type": "string"}
 	obj := func(props map[string]any) map[string]any {
 		req := make([]string, 0, len(props))
@@ -38,10 +39,14 @@ func scriptSchema(minSections, maxSections int) json.RawMessage {
 		}
 		return map[string]any{"type": "object", "properties": props, "required": req, "additionalProperties": false}
 	}
+	section := map[string]any{"heading": str, "narration": str, "onScreenText": str}
+	if dialogue {
+		section["speaker"] = map[string]any{"type": "string", "enum": []string{"A", "B"}}
+	}
 	s := obj(map[string]any{
 		"hook": str,
 		"sections": map[string]any{"type": "array", "minItems": minSections, "maxItems": maxSections,
-			"items": obj(map[string]any{"heading": str, "narration": str, "onScreenText": str})},
+			"items": obj(section)},
 		"outro": str,
 		"claims": map[string]any{"type": "array", "minItems": 0, "maxItems": 20,
 			"items": obj(map[string]any{"text": str, "sourceHint": str})},
@@ -67,6 +72,15 @@ func (s *Service) GenerateScript(ctx context.Context, ch *channel.Channel, v *Vi
 	idea := ch.Blueprint.Ideas[v.IdeaIndex]
 	words := int(float64(v.TargetSeconds) * WordsPerSecond)
 	sections := min(max(v.TargetSeconds/45, 2), 10)
+	mode, dialogue := dialogueMode(v.DialogueMode)
+	dialogue = dialogue && IsDialogue(mode.ID)
+	voices := ""
+	if dialogue {
+		// Each section is one speaker's turn, so dialogues need more of them.
+		sections = min(max(words/30, 4), 24)
+		voices = fmt.Sprintf("\nThis is a two-voice script (%s). Speaker A is the %s and speaker B is the %s. %s\nEach section is one turn: set its \"speaker\" to \"A\" or \"B\". The hook and outro are spoken by A. Never make either speaker a real, named person.",
+			mode.Name, strings.ToLower(mode.SpeakerA), strings.ToLower(mode.SpeakerB), mode.Guide)
+	}
 	var audience, identity string
 	if ch.Strategy != nil {
 		audience, identity = ch.Strategy.TargetAudience, ch.Strategy.EditorialIdentity
@@ -91,16 +105,16 @@ Format: %s
 
 Length: about %d spoken words in total across hook, %d sections, and outro.
 The hook is 1-2 sentences that state what the viewer will learn, honestly.
-The outro summarizes and invites viewers to subscribe without pressure.
+The outro summarizes and invites viewers to subscribe without pressure.%s
 Write in %s.`, ch.Name, audience, identity, idea.WorkingTitle, idea.Topic, idea.Angle, idea.WhyInteresting,
-		strings.Join(idea.ResearchSources, "; "), idea.Format, words, sections, lang)
+		strings.Join(idea.ResearchSources, "; "), idea.Format, words, sections, voices, lang)
 
 	var lastErr error
 	for range 3 {
 		var out scriptOutput
 		err := s.gen.GenerateJSON(ctx, llm.Request{
 			Messages:    []llm.Message{{Role: "system", Content: scriptSystemPrompt}, {Role: "user", Content: user}},
-			Schema:      scriptSchema(sections, sections+2),
+			Schema:      scriptSchema(sections, sections+2, dialogue),
 			Temperature: 0.6,
 			MaxTokens:   min(words*2+800, 6000),
 		}, &out)
@@ -134,7 +148,13 @@ func scriptFromOutput(o scriptOutput, model string, now time.Time) *Script {
 		if len(on) > 120 {
 			on = on[:120]
 		}
-		sc.Sections = append(sc.Sections, Section{Heading: clean(sec.Heading), Narration: clean(sec.Narration), OnScreenText: on})
+		speaker := ""
+		if sec.Speaker == "B" {
+			speaker = "B"
+		} else if sec.Speaker == "A" {
+			speaker = "A"
+		}
+		sc.Sections = append(sc.Sections, Section{Heading: clean(sec.Heading), Narration: clean(sec.Narration), OnScreenText: on, Speaker: speaker})
 	}
 	seen := map[string]bool{}
 	for _, c := range o.Claims {

@@ -38,6 +38,8 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
   letter-spacing: -0.015em; -webkit-text-stroke: calc(var(--u) * 1.5) #000000; paint-order: stroke fill;
   filter: drop-shadow(0 calc(var(--u) * 0.8) calc(var(--u) * 0.6) rgba(0,0,0,0.55)); }
 .cap.hot { color: #FFE14D; }
+.cap.spk-b { color: #7FDBFF; }
+.cap.spk-b.hot { color: #FFE14D; }
 .end { position: absolute; left: 50%; bottom: 11%; z-index: 3; transform: translateX(-50%); visibility: hidden; white-space: nowrap;
   background: var(--accent); color: #FFFFFF; font-weight: 800; font-size: calc(var(--u) * 4.4); padding: calc(var(--u) * 2.2) calc(var(--u) * 5);
   border-radius: 999px; box-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0,0,0,0.35); }
@@ -55,7 +57,7 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
     <div class="title">{{.Headline}}</div>
   </div>
 {{end}}{{end}}  <div class="caps clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="2">
-{{range $i, $c := .Captions}}    <div class="cap{{if $c.Hot}} hot{{end}}" id="{{cid $i}}" style="{{capsize $c}}">{{range $c.Words}}{{.Text}} {{end}}</div>
+{{range $i, $c := .Captions}}    <div class="cap{{if $c.Hot}} hot{{end}}{{if eq $c.Speaker "B"}} spk-b{{end}}" id="{{cid $i}}" style="{{capsize $c}}">{{range $c.Words}}{{.Text}} {{end}}</div>
 {{end}}  </div>
   <div class="fx clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="3">
     <div class="end" id="end">Follow {{.ChannelName}} for more</div>

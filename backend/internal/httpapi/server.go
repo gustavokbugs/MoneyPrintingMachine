@@ -143,6 +143,7 @@ func NewHandler(d Deps) http.Handler {
 		mux.HandleFunc("POST /api/videos/{id}/approve", s.approveVideo)
 		mux.HandleFunc("PUT /api/videos/{id}/voice", s.setVoice)
 		mux.HandleFunc("PUT /api/videos/{id}/style", s.setStyle)
+		mux.HandleFunc("PUT /api/videos/{id}/dialogue", s.setDialogue)
 		mux.HandleFunc("POST /api/videos/{id}/script/generate", s.startVideoJob(production.KindScript, d.Videos.CheckCanScript))
 		mux.HandleFunc("POST /api/videos/{id}/produce", s.startVideoJob(production.KindProduce, d.Videos.CheckCanProduce))
 		mux.HandleFunc("GET /api/videos/{id}/media/{file}", s.videoMedia)
