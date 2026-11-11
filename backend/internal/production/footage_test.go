@@ -121,7 +121,7 @@ func TestPlanFootageErrors(t *testing.T) {
 
 func TestShotArgsFillFrame(t *testing.T) {
 	args := strings.Join(shotArgs(FootageShot{Path: "c.mp4", Offset: 1, Length: 3.5}, 0, 1080, 1920, "s.mp4"), " ")
-	for _, want := range []string{"-stream_loop -1 -ss 1.000 -t 3.500 -i c.mp4 -an", "force_original_aspect_ratio=increase,crop=1080:1920", "fps=30", "s.mp4"} {
+	for _, want := range []string{"-stream_loop -1 -ss 1.000 -t 3.500 -i c.mp4 -an", "force_original_aspect_ratio=increase,crop=1080:1920", "fps=30", "format=yuv420p", "s.mp4"} {
 		if !strings.Contains(args, want) {
 			t.Errorf("args missing %q: %s", want, args)
 		}

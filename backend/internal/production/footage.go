@@ -230,7 +230,7 @@ func clipKey(c stock.Clip) string { return c.Provider + ":" + strconv.FormatInt(
 // the frame and panned slowly, alternating direction by shot index.
 func shotArgs(shot FootageShot, index, width, height int, out string) []string {
 	sec := func(f float64) string { return strconv.FormatFloat(f, 'f', 3, 64) }
-	grade := "setsar=1,fps=30,eq=contrast=1.04:saturation=1.08"
+	grade := "setsar=1,fps=30,eq=contrast=1.04:saturation=1.08,format=yuv420p"
 	if shot.Clip.Image {
 		// Cover the frame at 115% so there is room to pan.
 		cw, ch := width*115/100, height*115/100
@@ -310,7 +310,11 @@ func (s *Service) renderFootage(ctx context.Context, dir string, segs []Timed, n
 	out := filepath.Join(dir, "visual.mp4")
 	_ = os.Remove(out)
 	if _, err := s.runner.Run(ctx, work, s.tools.FFmpeg, "-y", "-hide_banner", "-loglevel", "error",
-		"-f", "concat", "-safe", "0", "-i", "shots.txt", "-c", "copy", out); err != nil {
+		// Re-encode while joining: shots from different sources can carry
+		// different stream parameters, which a stream copy joins into a file
+		// that stops decoding partway.
+		"-f", "concat", "-safe", "0", "-i", "shots.txt", "-an", "-vf", "fps=30,format=yuv420p",
+		"-c:v", "libx264", "-preset", "veryfast", "-crf", "20", out); err != nil {
 		return "", nil, fmt.Errorf("join shots: %w", err)
 	}
 	_ = os.RemoveAll(work)
