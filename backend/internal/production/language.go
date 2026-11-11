@@ -56,3 +56,36 @@ func followText(channelLang, channelName string) string {
 	}
 	return "Follow " + channelName + " for more"
 }
+
+// languageName names a channel language for prompts.
+func languageName(tag string) string {
+	if l, _ := speechLang(tag); l == langPortugueseBR {
+		return "Brazilian Portuguese (português do Brasil)"
+	}
+	if t := strings.TrimSpace(tag); t != "" && !strings.EqualFold(t, "en-US") {
+		return "the language with BCP 47 tag " + t
+	}
+	return "American English"
+}
+
+// englishMarkers are frequent English words that are not Portuguese words.
+var englishMarkers = map[string]bool{"the": true, "you": true, "your": true, "and": true, "but": true, "now": true,
+	"with": true, "it's": true, "is": true, "are": true, "this": true, "that": true, "just": true, "so": true}
+
+// wrongLanguage reports whether a script for a Portuguese channel came
+// back mostly in English (more than 1 in 12 words is an English marker).
+func wrongLanguage(sc *Script, tag string) bool {
+	if l, _ := speechLang(tag); l != langPortugueseBR {
+		return false
+	}
+	words, english := 0, 0
+	for _, seg := range sc.Segments() {
+		for _, w := range strings.Fields(strings.ToLower(seg.Narration)) {
+			words++
+			if englishMarkers[strings.Trim(w, ".,!?;:\"()")] {
+				english++
+			}
+		}
+	}
+	return words > 0 && english*12 > words
+}

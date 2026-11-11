@@ -110,9 +110,11 @@ func (s *Service) GenerateScript(ctx context.Context, ch *channel.Channel, v *Vi
 	if ch.Strategy != nil {
 		audience, identity = ch.Strategy.TargetAudience, ch.Strategy.EditorialIdentity
 	}
-	lang := "American English"
-	if ch.Language != "en-US" {
-		lang = "the language with BCP 47 tag " + ch.Language
+	lang := languageName(ch.Language)
+	if lang != "American English" {
+		// Small models drift into English when the instructions and the
+		// examples are English, so the rule is repeated in the system prompt.
+		system += fmt.Sprintf("\n- Write the hook, every section (heading, narration, on-screen text), and the outro ONLY in %s. Any examples above are in English; never copy their language.", lang)
 	}
 	user := fmt.Sprintf(`Write the narration script for one video.
 <video>
@@ -152,6 +154,10 @@ Write in %s.`, ch.Name, audience, identity, idea.WorkingTitle, idea.Topic, idea.
 		sc := scriptFromOutput(out, s.gen.Model(), s.now())
 		if verr := sc.Validate(); verr != nil {
 			lastErr = fmt.Errorf("%w: %v", llm.ErrInvalidOutput, verr)
+			continue
+		}
+		if wrongLanguage(sc, ch.Language) {
+			lastErr = fmt.Errorf("%w: the script is not in %s", llm.ErrInvalidOutput, lang)
 			continue
 		}
 		if copiesExample(sc, guide) {

@@ -92,3 +92,25 @@ func TestNarratorUsesBridgeForPortuguese(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+func TestWrongLanguage(t *testing.T) {
+	english := &Script{Hook: "You need shelter from the rain.", Sections: []Section{{Narration: "You stack sticks. But now the sticks fall apart."}}}
+	portuguese := &Script{Hook: "Você precisa de abrigo da chuva.", Sections: []Section{{Narration: "Você empilha galhos. Mas agora os galhos caem."}}}
+	if !wrongLanguage(english, "pt-BR") || wrongLanguage(portuguese, "pt-BR") || wrongLanguage(english, "en-US") {
+		t.Error("language check")
+	}
+	if languageName("pt-BR") != "Brazilian Portuguese (português do Brasil)" || languageName("en-US") != "American English" {
+		t.Error("language names")
+	}
+}
+
+func TestPortugueseRuleInSystemPrompt(t *testing.T) {
+	gen := &scriptedGen{}
+	svc, _ := newTestService(t, gen, nil, Tools{})
+	ch := testChannel()
+	ch.Language = "pt-BR"
+	_, _ = svc.GenerateScript(context.Background(), ch, &Video{TargetSeconds: 60, StoryFormat: FormatFixChain})
+	if len(gen.requests) == 0 || !strings.Contains(gen.requests[0].Messages[0].Content, "ONLY in Brazilian Portuguese") {
+		t.Error("the system prompt must insist on Portuguese")
+	}
+}
