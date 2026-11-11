@@ -89,6 +89,16 @@ func TestStartRules(t *testing.T) {
 	if err := v.CanStartScript(); err == nil {
 		t.Fatal("cannot start a second script job")
 	}
+	for _, st := range []Status{StatusProducing} {
+		if err := (&Video{Status: st}).CanStartScript(); err == nil {
+			t.Fatalf("no new script while %s", st)
+		}
+	}
+	for _, st := range []Status{StatusProduced, StatusApproved} {
+		if err := (&Video{Status: st}).CanStartScript(); err != nil {
+			t.Fatalf("a %s video may get a new script: %v", st, err)
+		}
+	}
 	v.Status = StatusFailed
 	v.Script = &Script{Claims: []Claim{{Text: "x", Status: ClaimUnverified}}}
 	if err := v.CanStartProduction(); err == nil {

@@ -212,7 +212,9 @@ type Video struct {
 // CanStartScript reports whether script generation may start.
 func (v *Video) CanStartScript() error {
 	switch v.Status {
-	case StatusPlanned, StatusScriptReady, StatusFailed:
+	// A finished or approved video may get a new script; it then needs
+	// review and approval again before the next render.
+	case StatusPlanned, StatusScriptReady, StatusFailed, StatusApproved, StatusProduced:
 		return nil
 	}
 	return &StateError{Status: v.Status, Action: "generate a script", Reason: "finish or cancel the current step first"}
