@@ -363,6 +363,9 @@ export interface VideoOutput {
   /** "animated:<style>" or "solid". */
   visuals?: string;
   visualsNote?: string;
+  /** Provenance of the soundtrack (generated in code). */
+  music?: string;
+  soundEffects?: number;
 }
 
 export interface Video {

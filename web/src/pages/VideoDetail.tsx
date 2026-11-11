@@ -245,6 +245,11 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
                   {t("video.downloadCaptions")}
                 </a>
               </div>
+              {v.output.music && (
+                <p className="xs muted">
+                  {t("video.soundtrack", { music: v.output.music })} {v.output.soundEffects ? t("video.soundEffects", { count: v.output.soundEffects }) : null}
+                </p>
+              )}
               {v.output.visualsNote && <Notice tone="warning">{v.output.visualsNote}</Notice>}
               {v.output.syntheticVoice && <Notice tone="info">{t("video.disclosure")}</Notice>}
             </div>
