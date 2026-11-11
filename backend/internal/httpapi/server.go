@@ -57,7 +57,9 @@ type Deps struct {
 	// Trend refresh and news feeds; nil disables their endpoints.
 	Watchlist WatchManager
 	// Videos enables the production pipeline endpoints.
-	Videos     Videos
+	Videos Videos
+	// Publisher enables publishing endpoints.
+	Publisher  Publisher
 	Feeds      FeedManager
 	Trajectory TrajectorySource
 	// WebBaseURL is where the browser returns after OAuth.
@@ -133,6 +135,10 @@ func NewHandler(d Deps) http.Handler {
 		mux.HandleFunc("POST /api/videos/{id}/script/generate", s.startVideoJob(production.KindScript, d.Videos.CheckCanScript))
 		mux.HandleFunc("POST /api/videos/{id}/produce", s.startVideoJob(production.KindProduce, d.Videos.CheckCanProduce))
 		mux.HandleFunc("GET /api/videos/{id}/media/{file}", s.videoMedia)
+		if d.Publisher != nil {
+			mux.HandleFunc("POST /api/videos/{id}/publish", s.publishVideo)
+			mux.HandleFunc("GET /api/videos/{id}/publications", s.listPublications)
+		}
 	}
 
 	mux.HandleFunc("GET /api/platforms", s.listPlatforms)

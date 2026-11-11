@@ -12,6 +12,7 @@ import (
 	"contentfactory/internal/jobs"
 	"contentfactory/internal/launchpad"
 	"contentfactory/internal/production"
+	"contentfactory/internal/publishing"
 	"contentfactory/internal/rss"
 	"contentfactory/internal/trends"
 	"contentfactory/internal/youtube"
@@ -75,6 +76,7 @@ func (s *server) writeDomainError(w http.ResponseWriter, r *http.Request, err er
 	var ve *channel.ValidationError
 	var te *channel.TransitionError
 	var stateErr *production.StateError
+	var unspeakable *production.UnspeakableError
 	switch {
 	case errors.As(err, &ve):
 		writeFieldError(w, http.StatusUnprocessableEntity, "validation_failed", ve.Error(), ve.Field)
@@ -106,6 +108,12 @@ func (s *server) writeDomainError(w http.ResponseWriter, r *http.Request, err er
 		writeError(w, http.StatusBadGateway, "upstream_unavailable", "YouTube could not be reached. Try again shortly.")
 	case errors.Is(err, trends.ErrInvalidQuery):
 		writeFieldError(w, http.StatusUnprocessableEntity, "validation_failed", err.Error(), "query")
+	case errors.Is(err, publishing.ErrAlreadyPublished), errors.Is(err, publishing.ErrInProgress), errors.Is(err, publishing.ErrNotProduced):
+		writeError(w, http.StatusConflict, "publish_blocked", err.Error())
+	case errors.Is(err, connections.ErrNotPublishable):
+		writeError(w, http.StatusConflict, "not_publishable", err.Error())
+	case errors.As(err, &unspeakable):
+		writeError(w, http.StatusConflict, "unspeakable_words", unspeakable.Error())
 	case errors.As(err, &stateErr):
 		writeError(w, http.StatusConflict, "invalid_state", stateErr.Error())
 	case errors.Is(err, production.ErrNotFound):

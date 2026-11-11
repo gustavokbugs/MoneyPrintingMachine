@@ -25,9 +25,11 @@ import (
 	"contentfactory/internal/llm"
 	"contentfactory/internal/postgres"
 	"contentfactory/internal/production"
+	"contentfactory/internal/publishing"
 	"contentfactory/internal/refresh"
 	"contentfactory/internal/rss"
 	"contentfactory/internal/trends"
+	"contentfactory/internal/youtube"
 )
 
 func main() {
@@ -98,6 +100,11 @@ func run(log *slog.Logger) error {
 	for k, h := range videos.Handlers() {
 		handlers[k] = h
 	}
+	publisher := publishing.NewService(postgres.NewPublicationRepository(pool), videos, channels, yt.connections,
+		youtube.NewUploader(&http.Client{}, "", yt.budget))
+	for k, h := range publisher.Handlers() {
+		handlers[k] = h
+	}
 	handlers[refresh.KindTrendRefresh] = refresh.Handler(trends.NewRefresher(watchlist, yt.trends), feeds, jobStore)
 
 	runner := jobs.NewRunner(jobStore, handlers, jobs.RunnerConfig{
@@ -129,6 +136,7 @@ func run(log *slog.Logger) error {
 		Quota:      yt.budget,
 		Watchlist:  watchlist,
 		Videos:     videos,
+		Publisher:  publisher,
 		Feeds:      feeds,
 		Trajectory: yt.trends,
 		WebBaseURL: cfg.WebBaseURL,
