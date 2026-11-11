@@ -140,6 +140,10 @@ func cutName(src string, i int) string {
 // backgrounds folder. Existing clips are kept, so it can be re-run after
 // adding sources. It returns the paths of the clips it made.
 func CutBackgrounds(ctx context.Context, tools Tools, runner Runner, mediaDir string, count int, length float64, width, height int) ([]string, error) {
+	// Tools run in other working directories, so paths must be absolute.
+	if abs, err := filepath.Abs(mediaDir); err == nil {
+		mediaDir = abs
+	}
 	outDir := filepath.Join(mediaDir, BackgroundsDir)
 	var made []string
 	for _, src := range listBackgrounds(filepath.Join(outDir, SourcesDir)) {

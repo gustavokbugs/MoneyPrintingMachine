@@ -114,6 +114,9 @@ func TestCutBackgrounds(t *testing.T) {
 	if err != nil || len(made) != 3 {
 		t.Fatalf("made %v, %v (190 s fits 3 clips)", made, err)
 	}
+	if !filepath.IsAbs(made[0]) {
+		t.Errorf("clip paths must be absolute, got %s", made[0])
+	}
 	clips := listBackgrounds(filepath.Join(media, BackgroundsDir))
 	if len(clips) != 3 {
 		t.Fatalf("clips ready for renders = %v", clips)
