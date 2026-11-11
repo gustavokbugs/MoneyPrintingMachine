@@ -96,7 +96,9 @@ func (s *Service) GenerateScript(ctx context.Context, ch *channel.Channel, v *Vi
 	}
 	system := scriptSystemPrompt
 	shape := "The hook is 1-2 sentences that state what the viewer will learn, honestly.\nThe outro summarizes and invites viewers to subscribe without pressure."
+	guide := ""
 	if f, ok := storyFormat(v.StoryFormat); ok && f.Guide != "" {
+		guide = f.Guide
 		// Viral formats: many short beats, one per section.
 		system = shortSystemPrompt
 		if !dialogue {
@@ -152,6 +154,10 @@ Write in %s.`, ch.Name, audience, identity, idea.WorkingTitle, idea.Topic, idea.
 			lastErr = fmt.Errorf("%w: %v", llm.ErrInvalidOutput, verr)
 			continue
 		}
+		if copiesExample(sc, guide) {
+			lastErr = fmt.Errorf("%w: the script copied the format example", llm.ErrInvalidOutput)
+			continue
+		}
 		sc.EstimatedSeconds = int(float64(sc.WordCount()) / WordsPerSecond)
 		return sc, nil
 	}
@@ -204,4 +210,24 @@ func stripSpeakerLabel(s string) (string, string) {
 		return s, ""
 	}
 	return strings.TrimSpace(s[len(m[0]):]), strings.ToUpper(m[2])
+}
+
+// copiesExample reports whether a script reuses lines of the format's
+// example beats, which small models tend to copy instead of imitating.
+func copiesExample(sc *Script, guide string) bool {
+	if guide == "" {
+		return false
+	}
+	g := strings.ToLower(guide)
+	lines := []string{sc.Hook}
+	for _, sec := range sc.Sections {
+		lines = append(lines, sec.Narration)
+	}
+	copied := 0
+	for _, l := range lines {
+		if l = strings.ToLower(strings.TrimSpace(l)); len(l) >= 12 && strings.Contains(g, l) {
+			copied++
+		}
+	}
+	return copied >= 2
 }

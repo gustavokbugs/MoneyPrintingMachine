@@ -65,3 +65,17 @@ func TestShortFormatShapesThePrompt(t *testing.T) {
 		t.Error("explainer must keep the original prompt")
 	}
 }
+
+func TestCopiesExample(t *testing.T) {
+	f, _ := storyFormat(FormatEscalation)
+	copied := &Script{Hook: "If you skip the dishes before vacation, you accidentally save millions of lives.",
+		Sections: []Section{{Narration: "You go on vacation. The plate does not."}, {Narration: "Your own line."}}}
+	if !copiesExample(copied, f.Guide) {
+		t.Error("a script reusing example lines must be rejected")
+	}
+	own := &Script{Hook: "If you prank your friends hard enough, you invent the computer virus.",
+		Sections: []Section{{Narration: "You're fifteen. It's 1982."}, {Narration: "Classic."}}}
+	if copiesExample(own, f.Guide) || copiesExample(copied, "") {
+		t.Error("original scripts and the explainer must pass")
+	}
+}
