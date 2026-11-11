@@ -80,7 +80,12 @@ export function ChannelWizard() {
           <h1>{title}</h1>
           <p className="small muted">{t("wizard.progress", { current: current + 1, total: steps.length, done: doneCount })}</p>
         </div>
-        <StatusBadge status={c.status} />
+        <div className="row">
+          <Link className="btn btn-secondary btn-sm" to={`/channels/${c.id}/videos`}>
+            {t("videos.manage")}
+          </Link>
+          <StatusBadge status={c.status} />
+        </div>
       </div>
 
       <nav aria-label={t("wizard.steps")} className="stepper">

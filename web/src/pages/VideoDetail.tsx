@@ -1,0 +1,237 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCheck, ChevronRight, CircleCheck, Download, FileText, Film, RotateCcw, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { api, newIdempotencyKey } from "../api/client";
+import type { ClaimStatus, Video, VideoScript } from "../api/types";
+import { EditableText } from "../components/EditableText";
+import { useToast } from "../components/feedback";
+import { Badge, Button, Empty, ErrorState, JobProgress, Notice, ProvenanceNote, Section, SkeletonCard, errorMessage } from "../components/ui";
+import { useJob } from "../hooks/useJob";
+import { formatDateTime, formatDuration, t } from "../i18n";
+import { VideoStatusBadge } from "./ChannelVideos";
+
+function useVideoJob(video: Video, start: (key: string) => ReturnType<typeof api.generateVideoScript>, doneMessage: string) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [jobId, setJobId] = useState<string | null>(null);
+  const job = useJob(jobId, () => {
+    void qc.invalidateQueries({ queryKey: ["video", video.id] });
+    void qc.invalidateQueries({ queryKey: ["videos", video.channelId] });
+    toast.success(doneMessage);
+  });
+  const m = useMutation({ mutationFn: () => start(newIdempotencyKey()), onSuccess: (j) => setJobId(j.id), onError: (err) => toast.error(errorMessage(err)) });
+  const running = m.isPending || job.data?.status === "queued" || job.data?.status === "running";
+  return { run: () => m.mutate(), running, job, jobId };
+}
+
+function ClaimsReview({ video, onChange }: { video: Video; onChange: (v: Video) => void }) {
+  const toast = useToast();
+  const review = useMutation({
+    mutationFn: ({ i, status }: { i: number; status: ClaimStatus }) => api.reviewClaim(video.id, i, status),
+    onSuccess: onChange,
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+  const claims = video.script?.claims ?? [];
+  if (claims.length === 0) return <p className="small muted">{t("video.noClaims")}</p>;
+  return (
+    <ol className="plain-list">
+      {claims.map((c, i) => (
+        <li key={`${i}-${c.text}`} className="subtle-panel">
+          <div className="row between wrap">
+            <span className={c.status === "removed" ? "muted" : undefined} style={c.status === "removed" ? { textDecoration: "line-through" } : undefined}>
+              {c.text}
+            </span>
+            <Badge tone={c.status === "verified" ? "success" : c.status === "removed" ? "neutral" : "warning"}>{t(`video.claim.${c.status}`)}</Badge>
+          </div>
+          {c.sourceHint && <p className="xs muted">{t("video.checkSource", { source: c.sourceHint })}</p>}
+          <div className="row wrap">
+            <Button size="sm" icon={CircleCheck} disabled={c.status === "verified" || review.isPending} onClick={() => review.mutate({ i, status: "verified" })}>
+              {t("video.markVerified")}
+            </Button>
+            <Button size="sm" variant="ghost" icon={Trash2} disabled={c.status === "removed" || review.isPending} onClick={() => review.mutate({ i, status: "removed" })}>
+              {t("video.markRemoved")}
+            </Button>
+            {c.status !== "unverified" && (
+              <Button size="sm" variant="ghost" icon={RotateCcw} disabled={review.isPending} onClick={() => review.mutate({ i, status: "unverified" })}>
+                {t("video.reopen")}
+              </Button>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+export function VideoDetail() {
+  const { id = "" } = useParams();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const video = useQuery({
+    queryKey: ["video", id],
+    queryFn: () => api.getVideo(id),
+    refetchInterval: (q) => (q.state.data?.status === "scripting" || q.state.data?.status === "producing" ? 3000 : false),
+  });
+  const status = useQuery({ queryKey: ["productionStatus"], queryFn: api.productionStatus });
+  const setVideo = (v: Video) => qc.setQueryData(["video", id], v);
+  const save = useMutation({ mutationFn: (s: VideoScript) => api.putVideoScript(id, s), onSuccess: setVideo });
+  const approve = useMutation({
+    mutationFn: () => api.approveVideo(id),
+    onSuccess: (v) => {
+      setVideo(v);
+      toast.success(t("video.approved"));
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+  const voice = useMutation({ mutationFn: (vid: number) => api.setVoice(id, vid), onSuccess: setVideo, onError: (err) => toast.error(errorMessage(err)) });
+
+  if (video.isPending) return <SkeletonCard lines={6} />;
+  if (video.isError) return <ErrorState error={video.error} onRetry={() => void video.refetch()} />;
+  return <VideoWorkspace video={video.data} tools={status.data} save={save} approve={approve} voice={voice} setVideo={setVideo} />;
+}
+
+interface WorkspaceProps {
+  video: Video;
+  tools: Awaited<ReturnType<typeof api.productionStatus>> | undefined;
+  save: { mutateAsync: (s: VideoScript) => Promise<Video> };
+  approve: { mutate: () => void; isPending: boolean };
+  voice: { mutate: (id: number) => void; isPending: boolean };
+  setVideo: (v: Video) => void;
+}
+
+function VideoWorkspace({ video: v, tools, save, approve, voice, setVideo }: WorkspaceProps) {
+  const scriptJob = useVideoJob(v, (k) => api.generateVideoScript(v.id, k), t("video.scriptDone"));
+  const produceJob = useVideoJob(v, (k) => api.produceVideo(v.id, k), t("video.produced"));
+  const sc = v.script;
+  const unresolved = sc ? sc.claims.filter((c) => c.status === "unverified").length : 0;
+  const busy = v.status === "scripting" || v.status === "producing";
+  const editSection = (i: number, narration: string) => (sc ? save.mutateAsync({ ...sc, sections: sc.sections.map((s, j) => (j === i ? { ...s, narration } : s)) }) : Promise.resolve());
+  const canProduce = (v.status === "approved" || v.status === "produced" || (v.status === "failed" && sc !== null && unresolved === 0)) && tools?.ready === true;
+
+  return (
+    <>
+      <nav aria-label={t("wizard.breadcrumb")} className="breadcrumb">
+        <ol>
+          <li>
+            <Link to={`/channels/${v.channelId}/videos`}>{t("videos.title")}</Link>
+            <ChevronRight size={14} aria-hidden="true" />
+          </li>
+          <li aria-current="page">{v.title}</li>
+        </ol>
+      </nav>
+      <div className="page-header">
+        <div>
+          <h1>{v.title}</h1>
+          <p className="small muted tabular">
+            {v.format} · {v.aspectRatio} · {t("video.target", { duration: formatDuration(v.targetSeconds) })}
+          </p>
+        </div>
+        <VideoStatusBadge status={v.status} />
+      </div>
+      {v.status === "failed" && v.statusReason && <ErrorState error={new Error(v.statusReason)} />}
+
+      <Section
+        title={t("video.scriptTitle")}
+        description={t("video.scriptHelp")}
+        actions={
+          <Button variant={sc ? "secondary" : "primary"} icon={Sparkles} loading={scriptJob.running || v.status === "scripting"} disabled={busy} onClick={scriptJob.run}>
+            {sc ? t("common.regenerate") : t("video.generateScript")}
+          </Button>
+        }
+      >
+        {scriptJob.jobId && <JobProgress job={scriptJob.job.data} error={scriptJob.job.error} />}
+        {!sc ? (
+          <Empty icon={FileText}>
+            <p>{t("video.noScript")}</p>
+          </Empty>
+        ) : (
+          <>
+            <ProvenanceNote p={sc.provenance} />
+            <p className="small muted tabular">{t("video.estimate", { duration: formatDuration(sc.estimatedSeconds || 0) })}</p>
+            <dl className="fields">
+              <div className="field">
+                <dt>{t("video.hook")}</dt>
+                <dd>{sc.hook}</dd>
+              </div>
+              {sc.sections.map((s, i) => (
+                <EditableText key={`${i}-${s.heading}`} label={`${i + 1}. ${s.heading || s.onScreenText}`} value={s.narration} multiline maxLength={4000} onSave={(val) => editSection(i, val)} />
+              ))}
+              <div className="field">
+                <dt>{t("video.outro")}</dt>
+                <dd>{sc.outro}</dd>
+              </div>
+            </dl>
+          </>
+        )}
+      </Section>
+
+      {sc && (
+        <Section title={t("video.claimsTitle")} description={t("video.claimsHelp")}>
+          <ClaimsReview video={v} onChange={setVideo} />
+          <div className="row wrap">
+            <Button variant="primary" icon={ShieldCheck} loading={approve.isPending} disabled={v.status !== "script_ready" || unresolved > 0} onClick={() => approve.mutate()}>
+              {t("video.approve")}
+            </Button>
+            {unresolved > 0 && <span className="small muted">{t("video.unresolved", { count: unresolved })}</span>}
+            {(v.status === "approved" || v.status === "produced") && (
+              <span className="row small">
+                <CheckCheck size={16} aria-hidden="true" className="tone-text-success" />
+                {t("video.isApproved")}
+              </span>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {sc && (
+        <Section title={t("video.produceTitle")} description={t("video.produceHelp")}>
+          {tools && !tools.ready && <Notice tone="warning">{t("video.toolsMissing", { missing: tools.missing.join(", ") })}</Notice>}
+          <div className="row wrap">
+            <label htmlFor="voice" className="label">
+              {t("video.voice")}
+            </label>
+            <select id="voice" value={v.voiceId} disabled={busy || voice.isPending} onChange={(e) => voice.mutate(Number(e.target.value))}>
+              {(tools?.voices ?? []).map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <Button variant="primary" icon={Film} loading={produceJob.running || v.status === "producing"} disabled={!canProduce || busy} onClick={produceJob.run}>
+              {v.output ? t("video.reproduce") : t("video.produce")}
+            </Button>
+          </div>
+          {produceJob.jobId && <JobProgress job={produceJob.job.data} error={produceJob.job.error} />}
+          {v.output && (
+            <div className="stack-sm">
+              <video
+                key={v.version}
+                controls
+                preload="metadata"
+                src={api.videoMediaUrl(v.id, "video.mp4", v.version)}
+                style={{ width: "100%", maxWidth: v.aspectRatio === "9:16" ? 360 : 960, aspectRatio: v.aspectRatio === "9:16" ? "9 / 16" : "16 / 9", background: "#000", borderRadius: 8 }}
+              >
+                <track kind="captions" srcLang="en" label="English" />
+              </video>
+              <p className="xs muted tabular">
+                {t("video.rendered", { duration: formatDuration(Math.round(v.output.durationSeconds)), size: `${v.output.width}×${v.output.height}`, date: formatDateTime(v.output.renderedAt) })}
+              </p>
+              <div className="row wrap">
+                <a className="btn btn-secondary btn-sm" href={api.videoMediaUrl(v.id, "video.mp4", v.version)} download={`${v.title}.mp4`}>
+                  <Download size={16} aria-hidden="true" />
+                  {t("video.downloadVideo")}
+                </a>
+                <a className="btn btn-ghost btn-sm" href={api.videoMediaUrl(v.id, "captions.srt", v.version)} download="captions.srt">
+                  <Download size={16} aria-hidden="true" />
+                  {t("video.downloadCaptions")}
+                </a>
+              </div>
+              {v.output.syntheticVoice && <Notice tone="info">{t("video.disclosure")}</Notice>}
+            </div>
+          )}
+        </Section>
+      )}
+    </>
+  );
+}

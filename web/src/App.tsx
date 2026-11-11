@@ -9,6 +9,8 @@ import { ChannelWizard } from "./pages/ChannelWizard";
 import { Dashboard } from "./pages/Dashboard";
 import { Launchpad } from "./pages/Launchpad";
 import { Trends } from "./pages/Trends";
+import { ChannelVideos } from "./pages/ChannelVideos";
+import { VideoDetail } from "./pages/VideoDetail";
 
 type ThemeChoice = "system" | "light" | "dark";
 const THEME_KEY = "theme";
@@ -125,6 +127,8 @@ export function App() {
             <Route path="/launchpad" element={<Launchpad />} />
             <Route path="/trends" element={<Trends />} />
             <Route path="/channels/:id" element={<ChannelWizard />} />
+            <Route path="/channels/:id/videos" element={<ChannelVideos />} />
+            <Route path="/videos/:id" element={<VideoDetail />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
