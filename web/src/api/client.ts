@@ -3,6 +3,7 @@ import {
   asItems,
   asJob,
   asRecordOf,
+  asVisualStyles,
   isRecord,
 } from "./guards";
 import type {
@@ -191,8 +192,11 @@ export const api = {
   },
   refreshTrends: async (key: string) => asJob(await request("POST", "/api/trends/refresh", undefined, idem(key))),
 
-  productionStatus: async () =>
-    asRecordOf<ProductionStatus>("production status", ["ready", "missing", "voices"])(await request("GET", "/api/production/status")),
+  productionStatus: async (): Promise<ProductionStatus> => {
+    const raw = await request("GET", "/api/production/status");
+    const status = asRecordOf<ProductionStatus>("production status", ["ready", "missing", "voices"])(raw);
+    return { ...status, styles: asVisualStyles(isRecord(raw) ? raw.styles : undefined), animatedScenes: status.animatedScenes === true };
+  },
   listVideos: async (channelId: string) =>
     asItems(await request("GET", `/api/channels/${encodeURIComponent(channelId)}/videos`), asRecordOf<Video>("video", ["id", "status"])),
   createVideo: async (channelId: string, ideaIndex: number) =>

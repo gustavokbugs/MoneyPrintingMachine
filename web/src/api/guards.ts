@@ -1,3 +1,4 @@
+import { type VisualStyle, visualStyles } from "./types";
 // Runtime checks for API responses. Responses are untrusted until their
 // essential shape is confirmed; deeper fields are validated by the server.
 
@@ -81,4 +82,19 @@ export function asRecordOf<T>(what: string, required: string[]) {
     }
     return v as T;
   };
+}
+
+/**
+ * asVisualStyles reads the server's style list ({id, name, description}
+ * objects, or plain ids) and keeps only ids this client knows how to label.
+ */
+export function asVisualStyles(v: unknown): VisualStyle[] {
+  if (!Array.isArray(v)) return ["auto"];
+  const out: VisualStyle[] = [];
+  for (const item of v) {
+    const id: unknown = isRecord(item) ? item.id : item;
+    const known = visualStyles.find((s) => s === id);
+    if (known && !out.includes(known)) out.push(known);
+  }
+  return out.length > 0 ? out : ["auto"];
 }

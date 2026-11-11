@@ -392,7 +392,9 @@ export interface ProductionStatus {
   animatedScenes: boolean;
 }
 
-export type VisualStyle = "auto" | "minimal" | "documentary" | "bold" | "tech";
+/** Visual styles the scene renderer supports; keep in sync with production.Styles. */
+export const visualStyles = ["auto", "minimal", "documentary", "bold", "tech"] as const;
+export type VisualStyle = (typeof visualStyles)[number];
 
 export type Privacy = "private" | "unlisted" | "public";
 

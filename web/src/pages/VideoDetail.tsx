@@ -219,6 +219,7 @@ function VideoWorkspace({ video: v, tools, save, approve, voice, style, setVideo
               {v.output ? t("video.reproduce") : t("video.produce")}
             </Button>
           </div>
+          <p className="xs muted">{t(`video.styleHelp.${v.visualStyle}`)}</p>
           {produceJob.jobId && <JobProgress job={produceJob.job.data} error={produceJob.job.error} />}
           {v.output && (
             <div className="stack-sm">
