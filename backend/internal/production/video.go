@@ -198,13 +198,15 @@ type Video struct {
 	VisualStyle   string `json:"visualStyle"`
 	// DialogueMode chooses one narrator or a two-voice script; VoiceB is
 	// the second speaker's voice.
-	DialogueMode string    `json:"dialogueMode"`
-	VoiceB       int       `json:"voiceB"`
-	Script       *Script   `json:"script"`
-	Output       *Output   `json:"output"`
-	Version      int       `json:"version"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	DialogueMode string `json:"dialogueMode"`
+	VoiceB       int    `json:"voiceB"`
+	// StoryFormat is how the script tells the story (see StoryFormats).
+	StoryFormat string    `json:"storyFormat"`
+	Script      *Script   `json:"script"`
+	Output      *Output   `json:"output"`
+	Version     int       `json:"version"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // CanStartScript reports whether script generation may start.

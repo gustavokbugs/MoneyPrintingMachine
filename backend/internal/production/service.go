@@ -91,7 +91,7 @@ func (s *Service) CreateFromIdea(ctx context.Context, ownerID, channelID string,
 	v := &Video{
 		OwnerID: ownerID, ChannelID: ch.ID, IdeaIndex: ideaIndex, Title: idea.WorkingTitle, Format: idea.Format,
 		AspectRatio: aspect, TargetSeconds: target, Status: StatusPlanned, VoiceID: DefaultVoice, VisualStyle: StyleAuto,
-		DialogueMode: DialogueNarration, VoiceB: DefaultVoiceB,
+		DialogueMode: DialogueNarration, VoiceB: DefaultVoiceB, StoryFormat: FormatExplainer,
 	}
 	if err := s.store.Create(ctx, v); err != nil {
 		return nil, err

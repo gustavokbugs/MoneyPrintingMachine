@@ -60,10 +60,12 @@ func (f fixedChannels) Get(_ context.Context, owner, id string) (*channel.Channe
 type scriptedGen struct {
 	responses []string
 	calls     int
+	requests  []llm.Request
 }
 
 func (g *scriptedGen) Model() string { return "test-model" }
-func (g *scriptedGen) GenerateJSON(_ context.Context, _ llm.Request, out any) error {
+func (g *scriptedGen) GenerateJSON(_ context.Context, req llm.Request, out any) error {
+	g.requests = append(g.requests, req)
 	g.calls++
 	if g.calls > len(g.responses) {
 		return llm.ErrUnavailable
