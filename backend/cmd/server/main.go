@@ -79,6 +79,16 @@ func run(log *slog.Logger) error {
 	}
 	pingCancel()
 
+	// Scripts may use a bigger model than setup and planning.
+	writer := model
+	if cfg.ScriptModel != cfg.OllamaModel {
+		if writer, err = llm.NewClient(cfg.OllamaURL, cfg.ScriptModel, cfg.LLMTimeout); err != nil {
+			return err
+		}
+		writer.WithContextTokens(cfg.LLMContextTokens)
+		log.Info("script model", "model", cfg.ScriptModel)
+	}
+
 	connections := postgres.NewPlatformConnectionRepository(pool)
 	channels := channel.NewService(postgres.NewChannelRepository(pool), connections)
 	jobStore := postgres.NewJobStore(pool)
@@ -101,7 +111,8 @@ func run(log *slog.Logger) error {
 	configureRendererEnv(localDir)
 	videos := production.NewService(postgres.NewVideoRepository(pool), channels, model,
 		production.ToolsFromRoot(localDir).WithRenderer(filepath.Join("..", "renderer")), production.ExecRunner{}, filepath.Join(localDir, "media")).
-		WithFootage(stock.Sources{Pexels: stock.NewClient(cfg.PexelsAPIKey, 2*time.Minute), Commons: stock.NewCommons(2 * time.Minute)})
+		WithFootage(stock.Sources{Pexels: stock.NewClient(cfg.PexelsAPIKey, 2*time.Minute), Commons: stock.NewCommons(2 * time.Minute)}).
+		WithScriptWriter(writer)
 	for k, h := range videos.Handlers() {
 		handlers[k] = h
 	}

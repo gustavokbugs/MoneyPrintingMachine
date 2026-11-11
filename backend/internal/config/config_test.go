@@ -30,6 +30,13 @@ func TestLoad(t *testing.T) {
 	if cfg.OllamaModel != "from-env" {
 		t.Errorf("environment should take precedence, got %q", cfg.OllamaModel)
 	}
+	if cfg.ScriptModel != "from-env" {
+		t.Errorf("ScriptModel should default to OLLAMA_MODEL, got %q", cfg.ScriptModel)
+	}
+	t.Setenv("OLLAMA_SCRIPT_MODEL", "qwen3:14b")
+	if c2, err := Load(env); err != nil || c2.ScriptModel != "qwen3:14b" || c2.OllamaModel != "from-env" {
+		t.Errorf("script model = %q, %v", c2.ScriptModel, err)
+	}
 	if cfg.WorkerConcurrency != 2 || cfg.HTTPAddr != "127.0.0.1:8080" || cfg.LLMTimeout != 10*time.Minute {
 		t.Errorf("unexpected config: %+v", cfg)
 	}

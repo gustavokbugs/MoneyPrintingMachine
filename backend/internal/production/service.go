@@ -45,14 +45,15 @@ type Generator interface {
 
 // Service implements the production use cases.
 type Service struct {
-	store    Store
-	channels Channels
-	gen      Generator
-	tools    Tools
-	runner   Runner
-	mediaDir string
-	now      func() time.Time
-	footage  FootageSource
+	store     Store
+	channels  Channels
+	gen       Generator
+	scriptGen Generator // optional; writes scripts (see WithScriptWriter)
+	tools     Tools
+	runner    Runner
+	mediaDir  string
+	now       func() time.Time
+	footage   FootageSource
 }
 
 // NewService builds a Service. mediaDir holds rendered files and the TTS cache.
@@ -63,6 +64,21 @@ func NewService(store Store, channels Channels, gen Generator, tools Tools, runn
 		mediaDir = abs
 	}
 	return &Service{store: store, channels: channels, gen: gen, tools: tools, runner: runner, mediaDir: mediaDir, now: time.Now}
+}
+
+// WithScriptWriter sets the model that writes scripts (a bigger one than
+// the planning model, for better writing).
+func (s *Service) WithScriptWriter(g Generator) *Service {
+	s.scriptGen = g
+	return s
+}
+
+// writer is the script-writing model.
+func (s *Service) writer() Generator {
+	if s.scriptGen != nil {
+		return s.scriptGen
+	}
+	return s.gen
 }
 
 // AnimatedScenes reports whether HyperFrames scene rendering is available.

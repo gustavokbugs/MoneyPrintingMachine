@@ -141,7 +141,7 @@ Write in %s.`, ch.Name, audience, identity, idea.WorkingTitle, idea.Topic, idea.
 	var lastErr error
 	for range 3 {
 		var out scriptOutput
-		err := s.gen.GenerateJSON(ctx, llm.Request{
+		err := s.writer().GenerateJSON(ctx, llm.Request{
 			Messages:    []llm.Message{{Role: "system", Content: system}, {Role: "user", Content: user}},
 			Schema:      scriptSchema(sections, sections+2, dialogue),
 			Temperature: 0.6,
@@ -154,7 +154,7 @@ Write in %s.`, ch.Name, audience, identity, idea.WorkingTitle, idea.Topic, idea.
 			}
 			return nil, err
 		}
-		sc := scriptFromOutput(out, s.gen.Model(), s.now())
+		sc := scriptFromOutput(out, s.writer().Model(), s.now())
 		if verr := sc.Validate(); verr != nil {
 			lastErr = fmt.Errorf("%w: %v", llm.ErrInvalidOutput, verr)
 			continue

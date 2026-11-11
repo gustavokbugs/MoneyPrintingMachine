@@ -126,7 +126,7 @@ func (s *Service) generateSceneScript(ctx context.Context, ch *channel.Channel, 
 		fmt.Fprintf(&b, "Write everything in %s.\n", lang)
 	}
 	var out rewriteOutput
-	err := s.gen.GenerateJSON(ctx, llm.Request{
+	err := s.writer().GenerateJSON(ctx, llm.Request{
 		Messages: []llm.Message{{Role: "system", Content: rewriteSystemPrompt}, {Role: "user", Content: b.String()}},
 		Schema:   rewriteSchema(len(ref.Lines)), Temperature: 0.7, MaxTokens: 1600,
 	}, &out)
@@ -144,7 +144,7 @@ func (s *Service) generateSceneScript(ctx context.Context, ch *channel.Channel, 
 				script.Sections[i].OnScreenText, script.Sections[i].Heading = on, on
 			}
 		}
-		model = s.gen.Model()
+		model = s.writer().Model()
 	}
 	script.Provenance = channel.Provenance{Generator: "ollama", Model: model, GeneratedAt: s.now().UTC()}
 	if err := script.Validate(); err != nil {

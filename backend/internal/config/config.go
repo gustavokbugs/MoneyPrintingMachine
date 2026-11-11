@@ -14,10 +14,13 @@ import (
 
 // Config holds runtime settings.
 type Config struct {
-	DatabaseURL       string
-	HTTPAddr          string
-	OllamaURL         string
-	OllamaModel       string
+	DatabaseURL string
+	HTTPAddr    string
+	OllamaURL   string
+	OllamaModel string
+	// ScriptModel writes video scripts; a bigger model writes better ones
+	// while setup and planning stay on the faster OllamaModel.
+	ScriptModel       string
 	LLMTimeout        time.Duration
 	LLMContextTokens  int
 	WorkerConcurrency int
@@ -50,6 +53,7 @@ func Load(envFile string) (Config, error) {
 		HTTPAddr:     getenv("HTTP_ADDR", "127.0.0.1:8080"),
 		OllamaURL:    getenv("OLLAMA_URL", "http://127.0.0.1:11434"),
 		OllamaModel:  getenv("OLLAMA_MODEL", "qwen3:4b"),
+		ScriptModel:  getenv("OLLAMA_SCRIPT_MODEL", ""),
 		LocalOwnerID: getenv("LOCAL_OWNER_ID", "local"),
 		WebDist:      os.Getenv("WEB_DIST"),
 		WebBaseURL:   getenv("WEB_BASE_URL", "http://127.0.0.1:5173"),
@@ -76,6 +80,9 @@ func Load(envFile string) (Config, error) {
 	}
 	if cfg.YouTubeDailyQuota, err = intEnv("YOUTUBE_DAILY_QUOTA", 10000, 1, 1_000_000); err != nil {
 		return Config{}, err
+	}
+	if cfg.ScriptModel == "" {
+		cfg.ScriptModel = cfg.OllamaModel
 	}
 	return cfg, nil
 }
