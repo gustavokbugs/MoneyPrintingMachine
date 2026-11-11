@@ -198,7 +198,12 @@ func FFmpegArgs(visual string, mix AudioMix, total float64, width, height int, b
 	// duration=first keeps the narration length; loudnorm targets the
 	// -14 LUFS level YouTube normalizes to.
 	fmt.Fprintf(&fc, "amix=inputs=%d:duration=first:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=%d[a];", layers, AudioRate)
-	fmt.Fprintf(&fc, "[0:v]subtitles=filename='%s':fontsdir='%s'[v]", filterPath(assFile), filterPath(fontsDir))
+	if assFile != "" {
+		fmt.Fprintf(&fc, "[0:v]subtitles=filename='%s':fontsdir='%s'[v]", filterPath(assFile), filterPath(fontsDir))
+	} else {
+		// Captions are already part of the animated visual.
+		fc.WriteString("[0:v]null[v]")
+	}
 	args = append(args, "-filter_complex", fc.String(), "-map", "[v]", "-map", "[a]",
 		"-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
 		"-c:a", "aac", "-b:a", "192k", "-ar", strconv.Itoa(AudioRate), "-movflags", "+faststart", "-shortest", out)
@@ -220,15 +225,4 @@ func (m AudioMix) musicGain() float64 {
 		return 0.30
 	}
 	return m.MusicGain
-}
-
-// WithoutTitles returns a copy of segs with the on-screen titles removed,
-// for when the visual track already shows them.
-func WithoutTitles(segs []Timed) []Timed {
-	out := make([]Timed, len(segs))
-	for i, s := range segs {
-		s.Title = ""
-		out[i] = s
-	}
-	return out
 }

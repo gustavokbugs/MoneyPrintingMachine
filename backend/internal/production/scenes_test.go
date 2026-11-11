@@ -3,6 +3,7 @@ package production
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -98,5 +99,71 @@ func TestWriteProjectEscapesContent(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "assets", "gsap.min.js")); err != nil {
 		t.Fatal("gsap not vendored into the project")
+	}
+}
+
+func TestEmphasisIndex(t *testing.T) {
+	cases := []struct {
+		words []string
+		want  int
+	}{
+		{strings.Fields("Over 1,200 satellites launched"), 1},
+		{strings.Fields("Why lasers matter so much"), 1}, // first of the longest words
+		{strings.Fields("It is so"), -1},
+	}
+	for _, c := range cases {
+		if got := emphasisIndex(c.words); got != c.want {
+			t.Errorf("emphasisIndex(%v) = %d, want %d", c.words, got, c.want)
+		}
+	}
+}
+
+func TestCaptionTrackTimesWords(t *testing.T) {
+	chunks := CaptionTrack([]Timed{{Duration: 4, Text: "One two three four five six"}}, 3)
+	if len(chunks) != 2 || len(chunks[0].Words) != 3 {
+		t.Fatalf("chunks = %+v", chunks)
+	}
+	prev := -1.0
+	for _, c := range chunks {
+		for _, w := range c.Words {
+			if w.At < c.Start || w.At >= c.End || w.At <= prev {
+				t.Fatalf("word %q at %v outside [%v, %v) or not increasing", w.Text, w.At, c.Start, c.End)
+			}
+			prev = w.At
+		}
+	}
+	if chunks[1].End < 3.99 || chunks[1].End > 4.01 {
+		t.Fatalf("last caption ends at %v", chunks[1].End)
+	}
+}
+
+func TestWriteProjectRendersCaptionsSafely(t *testing.T) {
+	root := t.TempDir()
+	gsap := filepath.Join(root, "gsap.min.js")
+	_ = os.WriteFile(gsap, []byte("/*gsap*/"), 0o644)
+	fonts := filepath.Join(root, "fontsource")
+	for _, f := range projectFonts {
+		p := filepath.Join(fonts, f.pkg, "files", f.file)
+		_ = os.MkdirAll(filepath.Dir(p), 0o755)
+		_ = os.WriteFile(p, []byte("font"), 0o644)
+	}
+	segs := []Timed{{Duration: 3, Title: "Why lasers matter", Text: `Lasers <b>hit</b> the "Moon".`}}
+	dir := filepath.Join(root, "project")
+	in := ProjectInput{Width: 1080, Height: 1920, Style: StyleBold, Scenes: PlanScenes(segs, nil, "Q"), Captions: CaptionTrack(segs, 3), Seed: 42}
+	if err := WriteProject(dir, in, gsap, fonts); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "index.html"))
+	html := string(b)
+	if !regexp.MustCompile(`var seed = +42 *;`).MatchString(html) {
+		t.Error("seed missing")
+	}
+	if strings.Contains(html, "<b>hit</b>") {
+		t.Fatal("caption text not escaped")
+	}
+	for _, want := range []string{`id="c0w0"`, `class="word em"`, `"words":[0`, `class="captions clip"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %q", want)
+		}
 	}
 }

@@ -141,16 +141,9 @@ func TestToolsMissing(t *testing.T) {
 	}
 }
 
-func TestWithoutTitlesDropsTitleCards(t *testing.T) {
-	segs := []Timed{{Duration: 2, Title: "Tidal Pull", Text: "Friction slows Earth."}}
-	ass := BuildASS(WithoutTitles(segs), 1080, 1920, Style{})
-	if strings.Contains(ass, ",Title,,") {
-		t.Fatal("title card still present")
-	}
-	if !strings.Contains(ass, "Friction slows Earth.") {
-		t.Fatal("captions missing")
-	}
-	if segs[0].Title != "Tidal Pull" {
-		t.Fatal("input mutated")
+func TestFFmpegArgsWithoutSubtitles(t *testing.T) {
+	joined := strings.Join(FFmpegArgs("visual.mp4", AudioMix{Voice: []string{"a.wav"}}, 3, 1080, 1920, "#000000", "", "f", "o.mp4"), " ")
+	if strings.Contains(joined, "subtitles=") || !strings.Contains(joined, "[0:v]null[v]") {
+		t.Fatalf("animated render must not burn ASS subtitles: %s", joined)
 	}
 }

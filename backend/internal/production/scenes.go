@@ -94,6 +94,24 @@ type Scene struct {
 	Prefix   string
 	Suffix   string
 	SizeTier int // 1 (long text) .. 3 (short text)
+	// Emph is the index of the headline word to highlight, or -1.
+	Emph int
+}
+
+// emphasisIndex picks the word to highlight: one with a digit, else the
+// longest word of at least five letters, else none.
+func emphasisIndex(words []string) int {
+	best, bestLen := -1, 4
+	for i, w := range words {
+		clean := strings.Trim(w, ".,!?;:\"'()…")
+		if strings.ContainsAny(clean, "0123456789") {
+			return i
+		}
+		if n := len([]rune(clean)); n > bestLen {
+			best, bestLen = i, n
+		}
+	}
+	return best
 }
 
 var leadingNumberRe = regexp.MustCompile(`^(.*?)(-?\d[\d,]*(?:\.\d+)?)(.*)$`)
@@ -157,7 +175,14 @@ func PlanScenes(segs []Timed, kickers []string, channelName string) []Scene {
 		}
 		sc.Headline = headline
 		sc.Words = strings.Fields(headline)
+		sc.Emph = -1
+		if sc.Kind == SceneStatement || sc.Kind == SceneTitle {
+			sc.Emph = emphasisIndex(sc.Words)
+		}
 		sc.SizeTier = sizeTier(headline)
+		if sc.Kind == SceneTitle && sc.SizeTier < 2 {
+			sc.SizeTier = 2 // the hook gets large type even when long
+		}
 		scenes = append(scenes, sc)
 		t += s.Duration
 	}
@@ -175,6 +200,39 @@ func firstSentence(s string, max int) string {
 	return s
 }
 
+// CaptionWord is one caption word and the time it is spoken.
+type CaptionWord struct {
+	Text string
+	At   float64
+}
+
+// CaptionChunk is a short caption line shown from Start to End.
+type CaptionChunk struct {
+	Start, End float64
+	Words      []CaptionWord
+}
+
+// CaptionTrack splits narration into short caption lines with an estimated
+// time per word (proportional to word length within each line).
+func CaptionTrack(segs []Timed, maxWords int) []CaptionChunk {
+	var out []CaptionChunk
+	for _, c := range Cues(segs, maxWords) {
+		words := strings.Fields(c.Text)
+		total := 0
+		for _, w := range words {
+			total += len([]rune(w)) + 1
+		}
+		ch := CaptionChunk{Start: c.Start, End: c.End}
+		t := c.Start
+		for _, w := range words {
+			ch.Words = append(ch.Words, CaptionWord{Text: w, At: t})
+			t += (c.End - c.Start) * float64(len([]rune(w))+1) / float64(max(total, 1))
+		}
+		out = append(out, ch)
+	}
+	return out
+}
+
 // ProjectInput is everything needed to write a HyperFrames project.
 type ProjectInput struct {
 	Width, Height int
@@ -183,6 +241,10 @@ type ProjectInput struct {
 	Secondary     string
 	ChannelName   string
 	Scenes        []Scene
+	// Captions are animated word by word inside the scene layer.
+	Captions []CaptionChunk
+	// Seed makes decorative randomness (particles) repeatable.
+	Seed uint32
 }
 
 type projectView struct {
@@ -190,8 +252,17 @@ type projectView struct {
 	Total float64
 	Unit  float64 // 1% of the shorter side, in px
 	// Safe area keeps scene text above the burned-in captions.
-	SafeBottom int
-	Data       []sceneData
+	SafeBottom    int
+	CaptionBottom int
+	Data          []sceneData
+	CaptionData   []captionData
+}
+
+type captionData struct {
+	ID    string    `json:"id"`
+	Start float64   `json:"start"`
+	End   float64   `json:"end"`
+	Words []float64 `json:"words"`
 }
 
 // sceneData is passed to the animation script as JSON (html/template
@@ -220,10 +291,17 @@ func WriteProject(dir string, in ProjectInput, gsapPath, fontsPkgDir string) err
 			return fmt.Errorf("copy font %s: %w", f.file, err)
 		}
 	}
-	v := projectView{ProjectInput: in, Unit: float64(min(in.Width, in.Height)) / 100, SafeBottom: in.Height * 24 / 100}
+	v := projectView{ProjectInput: in, Unit: float64(min(in.Width, in.Height)) / 100, SafeBottom: in.Height * 24 / 100, CaptionBottom: in.Height * 7 / 100}
 	for i, s := range in.Scenes {
 		v.Total = s.Start + s.Duration
 		v.Data = append(v.Data, sceneData{Kind: s.Kind, ID: fmt.Sprintf("s%d", i), Start: s.Start, Duration: s.Duration, Value: s.Value, Decimals: s.Decimals})
+	}
+	for i, c := range in.Captions {
+		d := captionData{ID: fmt.Sprintf("c%d", i), Start: c.Start, End: c.End, Words: []float64{}}
+		for _, w := range c.Words {
+			d.Words = append(d.Words, w.At)
+		}
+		v.CaptionData = append(v.CaptionData, d)
 	}
 	var b bytes.Buffer
 	if err := projectTemplate.Execute(&b, v); err != nil {
@@ -264,4 +342,6 @@ var projectTemplate = template.Must(template.New("index").Funcs(template.FuncMap
 	"accent2": func(v projectView) template.CSS { return cssColor(v.Secondary, "#1E3A8A") },
 	"sec":     func(f float64) string { return strconv.FormatFloat(f, 'f', 3, 64) },
 	"sid":     func(i int) string { return fmt.Sprintf("s%d", i) },
+	"cid":     func(i int) string { return fmt.Sprintf("c%d", i) },
+	"wid":     func(i, j int) string { return fmt.Sprintf("c%dw%d", i, j) },
 }).Parse(projectHTML))

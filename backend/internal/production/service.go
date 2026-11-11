@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -421,7 +422,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	if s.tools.AnimatedScenes() {
 		visual, err = s.renderScenes(rctx, dir, ProjectInput{
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
-			ChannelName: ch.Name, Scenes: scenes,
+			ChannelName: ch.Name, Scenes: scenes, Captions: CaptionTrack(segs, captionWords(width, height)), Seed: seedOf(v.ID),
 		})
 		if err != nil {
 			visual, note = "", "Animated scenes failed, so a plain background was used: "+truncateErr(err, 300)
@@ -431,13 +432,14 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 	} else {
 		note = "Animated scenes are not installed (run npm install in renderer/)."
 	}
-	// Animated scenes already show section headings; keep only captions then.
-	assSegs := segs
-	if visual != "" {
-		assSegs = WithoutTitles(segs)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "captions.ass"), []byte(BuildASS(assSegs, width, height, style)), 0o644); err != nil {
-		return nil, fmt.Errorf("write subtitles: %w", err)
+	// Animated scenes carry their own titles and word-by-word captions; the
+	// plain fallback burns in titles and captions with ASS subtitles.
+	assFile := ""
+	if visual == "" {
+		assFile = "captions.ass"
+		if err := os.WriteFile(filepath.Join(dir, assFile), []byte(BuildASS(segs, width, height, style)), 0o644); err != nil {
+			return nil, fmt.Errorf("write subtitles: %w", err)
+		}
 	}
 	// Soundtrack: an original music bed and effects synthesized in code.
 	mood := MoodFor(resolved)
@@ -454,7 +456,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		return nil, fmt.Errorf("render effects: %w", err)
 	}
 	tmp := "video.tmp.mp4"
-	if _, err := s.runner.Run(rctx, dir, s.tools.FFmpeg, FFmpegArgs(visual, mix, total, width, height, style.Background, "captions.ass", fontsRel, tmp)...); err != nil {
+	if _, err := s.runner.Run(rctx, dir, s.tools.FFmpeg, FFmpegArgs(visual, mix, total, width, height, style.Background, assFile, fontsRel, tmp)...); err != nil {
 		_ = os.Remove(filepath.Join(dir, tmp))
 		return nil, fmt.Errorf("render video: %w", err)
 	}
@@ -472,6 +474,22 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		Music:        "Original score generated in code (" + mood.Description + "); no third-party audio.",
 		SoundEffects: len(effects),
 	}, nil
+}
+
+// captionWords is the caption line length: short punchy lines for
+// vertical video, longer ones for landscape.
+func captionWords(width, height int) int {
+	if height > width {
+		return 3
+	}
+	return 6
+}
+
+// seedOf derives a stable 32-bit seed from an ID.
+func seedOf(id string) uint32 {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(id))
+	return h.Sum32()
 }
 
 // speechTools returns the tools with the supplement lexicon attached,
