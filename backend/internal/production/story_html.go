@@ -31,17 +31,17 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
   box-shadow: 0 calc(var(--u) * 1.4) calc(var(--u) * 4) rgba(0,0,0,0.35); }
 .hook .who { display: flex; align-items: center; gap: calc(var(--u) * 2); font-weight: 800; font-size: calc(var(--u) * 3.6); margin-bottom: calc(var(--u) * 2); }
 .hook .dot { width: calc(var(--u) * 6.5); height: calc(var(--u) * 6.5); border-radius: 50%; background: var(--accent); flex: none; }
-.hook .title { font-weight: 800; font-size: calc(var(--u) * 6.2); line-height: 1.12; letter-spacing: -0.01em; }
+.hook .title { font-weight: 800; font-size: calc(var(--u) * 5.6); line-height: 1.12; letter-spacing: -0.01em; }
 .caps { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 4; pointer-events: none; }
-.cap { position: absolute; left: calc(var(--u) * 5); right: calc(var(--u) * 5); top: 46%; transform-origin: 50% 50%;
+.cap { position: absolute; left: calc(var(--u) * 5); right: calc(var(--u) * 5); top: {{if .PopData}}58%{{else}}46%{{end}}; transform-origin: 50% 50%;
   text-align: center; visibility: hidden; color: #FFFFFF; font-weight: 800; font-size: calc(var(--u) * 12.5); line-height: 1.05;
   letter-spacing: -0.015em; -webkit-text-stroke: calc(var(--u) * 1.5) #000000; paint-order: stroke fill;
   filter: drop-shadow(0 calc(var(--u) * 0.8) calc(var(--u) * 0.6) rgba(0,0,0,0.55)); }
 .cap.hot { color: #FFE14D; }
 .cap.spk-b { color: #7FDBFF; }
 .cap.spk-b.hot { color: #FFE14D; }
-.pop { position: absolute; left: 50%; top: 17%; width: 64%; height: 27%; z-index: 4; visibility: hidden;
-  margin-left: -32%; background: #FFFFFF; padding: calc(var(--u) * 1.6); border-radius: calc(var(--u) * 3);
+.pop { position: absolute; left: 50%; top: 20%; width: 80%; height: 34%; z-index: 4; visibility: hidden;
+  margin-left: -40%; background: #FFFFFF; padding: calc(var(--u) * 1.6); border-radius: calc(var(--u) * 3);
   box-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 6) rgba(0,0,0,0.5); }
 .pop img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: calc(var(--u) * 1.8); }
 .end { position: absolute; left: 50%; bottom: 11%; z-index: 3; transform: translateX(-50%); visibility: hidden; white-space: nowrap;
@@ -58,7 +58,7 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
   </div>
 {{if .Scenes}}{{with index .Scenes 0}}  <div class="hook clip" id="hook" data-start="0" data-duration="{{sec .Duration}}" data-track-index="1">
     <div class="who"><span class="dot"></span><span>{{$.ChannelName}}</span></div>
-    <div class="title">{{.Headline}}</div>
+    <div class="title">{{if $.HookText}}{{$.HookText}}{{else}}{{.Headline}}{{end}}</div>
   </div>
 {{end}}{{end}}  <div class="pops clip" data-start="0" data-duration="{{sec .Total}}" data-track-index="4">
 {{range .PopData}}    <div class="pop" id="{{.ID}}"><img src="{{.Src}}" alt=""></div>
@@ -272,6 +272,12 @@ html, body { width: {{.Width}}px; height: {{.Height}}px; overflow: hidden; backg
     tl.fromTo(el, { scale: 0.55, rotation: tilt }, { scale: 1, rotation: 0, duration: 0.14, ease: "back.out(2.6)", immediateRender: false }, c.start);
     tl.set(el, { autoAlpha: 0 }, c.end);
   });
+
+  // The hook card flies up when the first photo arrives during it.
+  var hookEl = document.getElementById("hook");
+  if (hookEl && POPS.length && POPS[0].start < Number(hookEl.dataset.duration)) {
+    tl.to(hookEl, { y: -U * 40, autoAlpha: 0, duration: 0.22, ease: "power2.in" }, Math.max(0.6, POPS[0].start - 0.18));
+  }
 
   // Photos pop up on their key word, wobble slightly, then shrink away.
   POPS.forEach(function (p, i) {

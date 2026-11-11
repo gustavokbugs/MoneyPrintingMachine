@@ -459,7 +459,7 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		visual, err = s.renderScenes(rctx, dir, ProjectInput{
 			Width: width, Height: height, Style: resolved, Palette: style, Secondary: secondary,
 			ChannelName: ch.Name, Scenes: scenes, Captions: captionsFor(resolved, segs, width, height), Seed: seedOf(v.ID),
-			Pops: pops,
+			Pops: pops, HookText: hookText(segs),
 		})
 		if err != nil {
 			visual, note = "", "Animated scenes failed, so a plain background was used: "+truncateErr(err, 300)
@@ -518,6 +518,14 @@ func (s *Service) Produce(ctx context.Context, ch *channel.Channel, v *Video) (*
 		Music:        "Original score generated in code (" + mood.Description + "); no third-party audio.",
 		SoundEffects: len(effects), CaptionTiming: timing, Footage: credits,
 	}, nil
+}
+
+// hookText is the opening line for the gameplay story's hook card.
+func hookText(segs []Timed) string {
+	if len(segs) == 0 {
+		return ""
+	}
+	return firstSentence(segs[0].Text, 140)
 }
 
 // captionsFor picks the caption layout: one word at a time for the

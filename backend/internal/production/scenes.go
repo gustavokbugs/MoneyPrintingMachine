@@ -303,6 +303,9 @@ type ProjectInput struct {
 	Seed uint32
 	// Pops are photos that pop up on key words (gameplay story only).
 	Pops []ImagePop
+	// HookText is the full hook for the gameplay story's card; scene
+	// headlines are shortened for big type.
+	HookText string
 }
 
 type projectView struct {
