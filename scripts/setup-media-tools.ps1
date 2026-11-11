@@ -38,7 +38,11 @@ $ffDir = Join-Path $local 'ffmpeg'
 if (-not (Test-Path (Join-Path $ffDir 'bin\ffmpeg.exe'))) {
   $base = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest'
   $zipName = 'ffmpeg-n8.1-latest-win64-gpl-8.1.zip'
-  $sums = (Invoke-WebRequest -Uri "$base/checksums.sha256" -UseBasicParsing).Content
+  # GitHub serves this as application/octet-stream, which PowerShell 5.1
+  # returns as bytes; save it and read it as text instead.
+  $sumsFile = Join-Path $dl 'ffmpeg-checksums.sha256'
+  Invoke-WebRequest -Uri "$base/checksums.sha256" -OutFile $sumsFile -UseBasicParsing
+  $sums = Get-Content $sumsFile -Raw
   $line = ($sums -split "`n") | Where-Object { $_ -match [regex]::Escape($zipName) } | Select-Object -First 1
   if (-not $line) { throw "No checksum listed for $zipName" }
   $sha = ($line -split '\s+')[0]
