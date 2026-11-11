@@ -22,3 +22,6 @@ backend/bin/
 *.exe
 coverage/
 *.tsbuildinfo
+
+# Local media tools and models (see scripts/setup-media-tools.ps1)
+.local/
