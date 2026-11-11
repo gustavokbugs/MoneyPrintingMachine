@@ -104,8 +104,8 @@ func PlanWordEffects(segs []Timed) []SFXCue {
 // soundQueries are photo searches that show what a sound effect is; the
 // kinds left out search the spoken word itself ("melted", "running").
 var soundQueries = map[string]string{
-	SFXFire: "fire flames", SFXSplash: "water splash", SFXKnock: "wooden door", SFXZap: "electric sparks",
-	SFXShatter: "broken glass", SFXImpact: "explosion", SFXHeartbeat: "human heart", SFXWind: "snowstorm",
+	SFXFire: "campfire", SFXSplash: "water splash", SFXKnock: "wooden door", SFXZap: "electric sparks",
+	SFXShatter: "broken glass", SFXImpact: "explosion", SFXHeartbeat: "human heart", SFXWind: "wind blowing trees",
 	SFXClock: "clock", SFXPop: "popcorn",
 }
 

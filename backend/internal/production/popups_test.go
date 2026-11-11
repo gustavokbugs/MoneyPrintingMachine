@@ -60,12 +60,12 @@ func TestEverySoundGetsAPicture(t *testing.T) {
 	for _, m := range got {
 		queries = append(queries, m.Query)
 	}
-	if strings.Join(queries, ",") != "house,fire flames,then,explosion" {
+	if strings.Join(queries, ",") != "house,campfire,then,explosion" {
 		t.Fatalf("queries = %v", queries)
 	}
 	// A key word within a second of a sound loses to the sound.
 	got = popMoments(segs, []popPlan{{Keyword: "burning", Query: "house"}, {}}, sounds)
-	if len(got) != 2 || got[0].Query != "fire flames" {
+	if len(got) != 2 || got[0].Query != "campfire" {
 		t.Fatalf("near moments = %+v", got)
 	}
 	if q := sfxQuery(SFXCue{Kind: SFXHiss, Word: "melted"}); q != "melted" {
