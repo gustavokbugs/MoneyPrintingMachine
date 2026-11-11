@@ -22,6 +22,8 @@ Last updated: 2026-11-10
 | Durable background jobs (retries, leases, idempotency) | Done | `internal/jobs`, PostgreSQL-backed |
 | PostgreSQL schema and migrations | Done | Applied automatically on server start |
 | Channel Launchpad wizard (niche → strategy → branding → platforms → blueprint → review) | Done | Generation steps need the local model (section 2) |
+| One-button channel setup (autopilot) | Done | Fills niche, strategy, identity, name, and blueprint in one job; connecting YouTube stays a human step |
+| Activity center | Done | Sidebar list of recent AI jobs with finish/fail notices (optional desktop notifications) |
 | Avatar and banner generation (SVG, PNG export) | Done | Deterministic, no GPU |
 | Web UI redesign (design system, themes, accessibility) | Done | `design-system/content-factory/MASTER.md` |
 | YouTube trend measurement and handle checks | Blocked | Code done; needs an API key (gap G2) |
@@ -31,6 +33,9 @@ Last updated: 2026-11-10
 | RSS news feeds as a trend source | Done | Add feeds on the Trends page; SSRF-protected fetcher |
 | Video production (script, fact-check gate, narration, render) | Done | Kokoro voice, FFmpeg, captions and SRT; UI on each video page |
 | Animated scenes (HyperFrames + GSAP) | Done | Styles: minimal, documentary, bold, tech, or auto from the niche; transitions, word-by-word captions, counters; falls back to a plain background |
+| Gameplay story style | Done | Original runner game drawn in code behind one-word centered captions; lo-fi bed |
+| Stock footage style | Done | Pexels videos with PEXELS_API_KEY (gap G11), else Wikimedia Commons photos with a slow pan; credits go into the description |
+| Word timing from the audio | Done | Parakeet TDT 110M via sherpa-onnx aligns captions to the narration |
 | Narration and soundtrack | Done | Kokoro v1.0 (fp32) voices; original music and effects synthesized in code; mastered to -14 LUFS |
 | YouTube publishing (resumable upload) | Blocked | Code and UI done; needs G3/G4. Private by default, marked as synthetic media |
 
@@ -61,6 +66,13 @@ Last updated: 2026-11-10
   5. Restart the backend.
 - **Unlocks:** measured demand/competition/trend scores in niche discovery, and name handle checks.
 - **Cost:** free within the default quota of 10,000 units/day. The app caps itself with `YOUTUBE_DAILY_QUOTA`.
+
+### G11. Pexels API key for stock video — Owner (optional)
+
+- **Why the owner:** the key needs a Pexels account. Agents must not create accounts.
+- **Steps:** sign up at <https://www.pexels.com/api/>, copy the key, put it in `backend/.env` as `PEXELS_API_KEY=...`, restart the backend.
+- **Unlocks:** real video clips in the Stock footage style. Without it the style uses Wikimedia Commons photos.
+- **Cost:** free (200 requests per hour, 20,000 per month). Pexels asks apps to credit Pexels and creators; the publish description does.
 
 ### G3. Google OAuth client for channel connections — Owner
 
@@ -106,6 +118,7 @@ Last updated: 2026-11-10
 
 | Date | Change |
 | --- | --- |
+| 2026-11-11 | Stock footage style (Pexels videos or Wikimedia Commons photos), one-button channel setup, activity center, captions timed from the audio, gameplay story style; partial content plans accepted (12+ ideas). |
 | 2026-11-10 | Kokoro v1.0 voices replace the int8 v0.19 model (removes buzz); synthesized music and effects; animated captions and transitions. |
 | 2026-11-10 | Media tools installed (G9); production and publishing UI built (G10); HyperFrames animated scenes with four styles. |
 | 2026-11-10 | Production pipeline backend added; PRs #1 and #2 merged; work continues on master. |

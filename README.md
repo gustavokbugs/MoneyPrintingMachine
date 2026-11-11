@@ -71,6 +71,8 @@ Channels reach **Ready** only after a platform connection is verified by the pla
 
    Without `renderer/`, videos render on a plain background.
 
+   The script also installs the small Parakeet model that times captions to the voice. For the **Stock footage** style, an optional free `PEXELS_API_KEY` in `backend/.env` adds real video clips; without it the style uses free-licensed Wikimedia Commons photos.
+
 ## YouTube setup (optional)
 
 Both parts are free and use a Google Cloud project you own.
