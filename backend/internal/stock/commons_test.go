@@ -3,6 +3,7 @@ package stock
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -139,5 +140,33 @@ func TestCommonsPacesRequests(t *testing.T) {
 	c.gap = time.Hour
 	if err := c.wait(ctx); err == nil {
 		t.Error("wait must honor cancellation")
+	}
+}
+
+type rtFunc func(*http.Request) (*http.Response, error)
+
+func (f rtFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestCommonsDownloadRetriesRateLimitOnce(t *testing.T) {
+	calls := 0
+	status := []int{http.StatusTooManyRequests, http.StatusOK}
+	c := NewCommons(5 * time.Second)
+	c.gap, c.retryWait = 0, 0
+	c.http.Transport = rtFunc(func(r *http.Request) (*http.Response, error) {
+		code := http.StatusTooManyRequests
+		if calls < len(status) {
+			code = status[calls]
+		}
+		calls++
+		return &http.Response{StatusCode: code, Body: io.NopCloser(strings.NewReader("jpeg")), Header: http.Header{}, Request: r}, nil
+	})
+	clip := Clip{Provider: ProviderCommons, ID: 7, FileID: 1, Image: true, FileURL: "https://upload.wikimedia.org/a.jpg"}
+	if path, err := c.Download(context.Background(), clip, t.TempDir()); err != nil || path == "" || calls != 2 {
+		t.Fatalf("path=%q err=%v calls=%d, want success on the retry", path, err, calls)
+	}
+	calls, status = 0, nil
+	clip.ID = 8
+	if _, err := c.Download(context.Background(), clip, t.TempDir()); !errors.Is(err, ErrRateLimited) || calls != 2 {
+		t.Fatalf("err=%v calls=%d, want ErrRateLimited after one retry", err, calls)
 	}
 }

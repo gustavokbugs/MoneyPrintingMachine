@@ -33,14 +33,16 @@ type Commons struct {
 	base string
 	// gap spaces requests so a burst of searches stays within the API's
 	// fair-use limits; last is guarded by mu.
-	gap  time.Duration
-	mu   sync.Mutex
-	last time.Time
+	gap time.Duration
+	// retryWait is the pause before retrying a rate-limited download.
+	retryWait time.Duration
+	mu        sync.Mutex
+	last      time.Time
 }
 
 // NewCommons builds a Wikimedia Commons client.
 func NewCommons(timeout time.Duration) *Commons {
-	c := &Commons{base: "https://commons.wikimedia.org/w/api.php", gap: 700 * time.Millisecond}
+	c := &Commons{base: "https://commons.wikimedia.org/w/api.php", gap: 700 * time.Millisecond, retryWait: 5 * time.Second}
 	c.http = &http.Client{Timeout: timeout, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) > 5 || !allowedFileHost(req.URL) {
 			return errors.New("unexpected redirect")
@@ -280,7 +282,22 @@ func titleWords(s string) []string {
 	return out
 }
 
-// Download stores the image under dir, cached by its URL hash.
+// Download stores the image under dir, cached by its URL hash. Image
+// servers rate-limit bursts too, so downloads are paced like searches and
+// retried once after a 429.
 func (c *Commons) Download(ctx context.Context, clip Clip, dir string) (string, error) {
-	return download(ctx, c.http, clip, dir, userAgent)
+	for attempt := 0; ; attempt++ {
+		if err := c.wait(ctx); err != nil {
+			return "", err
+		}
+		path, err := download(ctx, c.http, clip, dir, userAgent)
+		if err == nil || !errors.Is(err, ErrRateLimited) || attempt > 0 {
+			return path, err
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(c.retryWait):
+		}
+	}
 }

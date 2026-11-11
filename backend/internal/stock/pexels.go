@@ -214,6 +214,9 @@ func download(ctx context.Context, hc *http.Client, clip Clip, dir, ua string) (
 		return "", fmt.Errorf("download clip %d: %w", clip.ID, err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return "", fmt.Errorf("download clip %d: %w", clip.ID, ErrRateLimited)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("download clip %d: HTTP %d", clip.ID, resp.StatusCode)
 	}
