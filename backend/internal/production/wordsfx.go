@@ -106,29 +106,29 @@ func PlanWordEffects(segs []Timed) []SFXCue {
 func renderWordEffect(t *Track, r *rng, c SFXCue) bool {
 	switch c.Kind {
 	case SFXHiss:
-		hiss(t, r, c.At, 1.2, 0.32)
+		hiss(t, r, c.At, 1.3, 0.8)
 	case SFXFire:
-		crackle(t, r, c.At, 1.5, 0.4)
+		crackle(t, r, c.At, 1.6, 0.8)
 	case SFXSplash:
-		splash(t, r, c.At, 0.45)
+		splash(t, r, c.At, 0.9)
 	case SFXKnock:
 		for k := 0; k < 3; k++ {
-			knock(t, r, c.At+float64(k)*0.17, 0.7)
+			knock(t, r, c.At+float64(k)*0.17, 0.9)
 		}
 	case SFXZap:
-		zap(t, r, c.At, 0.6, 0.3)
+		zap(t, r, c.At, 0.6, 0.45)
 	case SFXShatter:
-		shatter(t, r, c.At, 0.5)
+		shatter(t, r, c.At, 0.8)
 	case SFXHeartbeat:
 		for k := 0; k < 2; k++ {
 			knockAt(t, c.At+float64(k)*0.8, 55, 0.12, 0.8)
 			knockAt(t, c.At+float64(k)*0.8+0.16, 50, 0.1, 0.6)
 		}
 	case SFXWind:
-		wind(t, r, c.At, 2.2, 0.35)
+		wind(t, r, c.At, 2.2, 0.8)
 	case SFXCrunch:
 		for k := 0; k < 7; k++ {
-			hiss(t, r, c.At+float64(k)*0.035+r.float()*0.02, 0.03, 0.4)
+			hiss(t, r, c.At+float64(k)*0.035+r.float()*0.02, 0.03, 0.8)
 		}
 	case SFXClock:
 		for k := 0; k < 4; k++ {
@@ -136,10 +136,13 @@ func renderWordEffect(t *Track, r *rng, c SFXCue) bool {
 			if k%2 == 1 {
 				f = 1600
 			}
-			blip(t, c.At+float64(k)*0.5, f, 0.015, 0.25)
+			blip(t, c.At+float64(k)*0.5, f, 0.015, 0.45)
 		}
 	case SFXPop:
-		pop(t, c.At, 0.4)
+		// A burst, like popcorn: quick pops at random moments.
+		for k := 0; k < 9; k++ {
+			pop(t, c.At+r.float()*1.1, 0.5+r.float()*0.4)
+		}
 	default:
 		return false
 	}
